@@ -13,8 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
+	"github.com/containerd/errdefs"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 type API struct {
@@ -122,7 +123,7 @@ func (a *API) getContainer(w http.ResponseWriter, r *http.Request) {
 	c, err := a.docker.ContainerInspect(r.Context(), id)
 	if err != nil {
 		status := http.StatusBadGateway
-		if client.IsErrNotFound(err) {
+		if errdefs.IsNotFound(err) {
 			status = http.StatusNotFound
 		}
 		writeError(w, status, err)
@@ -172,7 +173,7 @@ func (a *API) containerAction(w http.ResponseWriter, r *http.Request, action fun
 	id := r.PathValue("id")
 	if err := action(r.Context(), id); err != nil {
 		status := http.StatusBadGateway
-		if client.IsErrNotFound(err) {
+		if errdefs.IsNotFound(err) {
 			status = http.StatusNotFound
 		}
 		writeError(w, status, err)
@@ -192,9 +193,14 @@ func summarizeContainer(c container.Summary) ContainerSummary {
 		networks = append(networks, name)
 	}
 
+	name := ""
+	if len(c.Names) > 0 {
+		name = strings.TrimPrefix(c.Names[0], "/")
+	}
+
 	return ContainerSummary{
 		ID:        c.ID,
-		Name:      strings.TrimPrefix(c.Names[0], "/"),
+		Name:      name,
 		Image:     c.Image,
 		State:     c.State,
 		Status:    c.Status,
