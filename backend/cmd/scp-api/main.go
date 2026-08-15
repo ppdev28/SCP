@@ -190,7 +190,7 @@ func (a *API) containerAction(w http.ResponseWriter, r *http.Request, action fun
 func summarizeContainer(c container.Summary) ContainerSummary {
 	ports := make([]Port, 0, len(c.Ports))
 	for _, p := range c.Ports {
-		ports = append(ports, Port{PrivatePort: p.PrivatePort, PublicPort: p.PublicPort, Type: p.Type, IP: p.IP})
+		ports = append(ports, Port{PrivatePort: p.PrivatePort, PublicPort: p.PublicPort, Type: p.Type, IP: p.IP.String()})
 	}
 
 	networks := make([]string, 0, len(c.NetworkSettings.Networks))
@@ -207,7 +207,7 @@ func summarizeContainer(c container.Summary) ContainerSummary {
 		ID:        c.ID,
 		Name:      name,
 		Image:     c.Image,
-		State:     c.State,
+		State:     string(c.State),
 		Status:    c.Status,
 		CreatedAt: c.Created,
 		Ports:     ports,
