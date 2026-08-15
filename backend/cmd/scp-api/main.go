@@ -97,7 +97,7 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
-	if _, err := a.docker.Ping(ctx); err != nil {
+	if _, err := a.docker.Ping(ctx, client.PingOptions{}); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "degraded", "docker": "unavailable"})
 		return
 	}
@@ -105,22 +105,23 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) listContainers(w http.ResponseWriter, r *http.Request) {
-	containers, err := a.docker.ContainerList(r.Context(), container.ListOptions{All: true})
+	result, err := a.docker.ContainerList(r.Context(), client.ContainerListOptions{All: true})
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
 	}
 
-	result := make([]ContainerSummary, 0, len(containers))
+	containers := result.Items
+	response := make([]ContainerSummary, 0, len(containers))
 	for _, c := range containers {
-		result = append(result, summarizeContainer(c))
+		response = append(response, summarizeContainer(c))
 	}
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (a *API) getContainer(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	c, err := a.docker.ContainerInspect(r.Context(), id)
+	result, err := a.docker.ContainerInspect(r.Context(), id, client.ContainerInspectOptions{})
 	if err != nil {
 		status := http.StatusBadGateway
 		if errdefs.IsNotFound(err) {
@@ -130,6 +131,7 @@ func (a *API) getContainer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	c := result.Container
 	response := map[string]any{
 		"id":      c.ID,
 		"name":    strings.TrimPrefix(c.Name, "/"),
@@ -153,19 +155,22 @@ func (a *API) getContainer(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) startContainer(w http.ResponseWriter, r *http.Request) {
 	a.containerAction(w, r, func(ctx context.Context, id string) error {
-		return a.docker.ContainerStart(ctx, id, container.StartOptions{})
+		_, err := a.docker.ContainerStart(ctx, id, client.ContainerStartOptions{})
+		return err
 	})
 }
 
 func (a *API) stopContainer(w http.ResponseWriter, r *http.Request) {
 	a.containerAction(w, r, func(ctx context.Context, id string) error {
-		return a.docker.ContainerStop(ctx, id, container.StopOptions{})
+		_, err := a.docker.ContainerStop(ctx, id, client.ContainerStopOptions{})
+		return err
 	})
 }
 
 func (a *API) restartContainer(w http.ResponseWriter, r *http.Request) {
 	a.containerAction(w, r, func(ctx context.Context, id string) error {
-		return a.docker.ContainerRestart(ctx, id, container.StopOptions{})
+		_, err := a.docker.ContainerRestart(ctx, id, client.ContainerRestartOptions{})
+		return err
 	})
 }
 
