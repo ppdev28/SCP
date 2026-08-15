@@ -1,18 +1,18 @@
 # Architecture
 
-## Current stage
+## Current direction
 
-SCP is being built in vertical slices. The frontend foundation is established first, while infrastructure integrations remain behind service/repository boundaries.
+SCP is being built in vertical slices. The current frontend is the product UI reference, while infrastructure integrations are implemented behind the Go backend.
 
 ```text
 React UI
    |
    v
-Application services / repositories
+SCP API client / application services
    |
-   +---- mock data (development)
+   +---- mock data (until a feature is connected)
    |
-   +---- HTTP / WebSocket API (production)
+   +---- HTTP / WebSocket API
                  |
                  v
               Go backend
@@ -22,16 +22,38 @@ Application services / repositories
      Docker             Linux    Metrics   Network
 ```
 
+The UI follows the product design generated in Figma Make. We deliberately keep the first implementation close to that UI instead of freezing a large domain model up front. Contracts can evolve when real workflows expose better requirements.
+
+## Backend boundaries
+
+The backend is responsible for infrastructure access and should keep Docker Engine, systemd, filesystem, networking and Linux metrics details out of the browser.
+
+The first implemented adapter is Docker. It currently exposes container discovery, inspection and basic lifecycle actions through `/api/v1/containers`.
+
+```text
+HTTP handler
+    |
+    v
+Container operations
+    |
+    v
+Docker SDK
+    |
+    v
+Docker Engine /var/run/docker.sock
+```
+
+The Docker socket is a highly privileged interface. It should not be exposed directly over TCP. In the initial self-hosted deployment SCP is expected to run on the same Linux host as Docker and be reached through a trusted private network such as Tailscale.
+
 ## Frontend boundaries
 
 - `components/` contains reusable visual components.
-- `pages/` contains route-level screens.
-- `services/` contains API and repository boundaries.
-- `data/mock/` contains deterministic development data.
-- `types/` contains domain models shared by UI and services.
+- `views/` contains the route-level product screens generated from the UI design.
+- `lib/` contains UI tokens, data and shared types.
+- infrastructure access belongs behind API/service boundaries rather than directly in visual components.
 
-## Backend direction
+## Future direction
 
-The backend will eventually expose APIs for Docker containers, system services, storage, networking, logs, metrics, security and updates. WebSockets will be considered for streaming logs, terminal sessions and live metrics.
+The product is intended to grow from a single Linux/Docker host into a broader infrastructure control plane. Possible future integrations include Linux services, storage, networking, monitoring, logs, multiple nodes, remote agents, Kubernetes and cloud providers.
 
-The UI should not directly depend on Docker Engine APIs or Linux implementation details.
+Those integrations should be added incrementally from real user workflows rather than by prematurely defining a large abstraction hierarchy.
