@@ -22,7 +22,7 @@ feature/project-foundation
 
 The latest important milestone is:
 
-> The Containers view successfully displays real containers from the developer's Ubuntu Server Docker Engine through the SCP Go API.
+> The Containers view displays real containers and executes real start, stop and restart operations against the developer's Ubuntu Server Docker Engine through the SCP Go API.
 
 ## Current architecture
 
@@ -55,6 +55,9 @@ The browser must never talk directly to Docker Engine.
 ```text
 GET /api/v1/health
 GET /api/v1/containers
+POST /api/v1/containers/{id}/start
+POST /api/v1/containers/{id}/stop
+POST /api/v1/containers/{id}/restart
 ```
 
 Health returns Docker availability and API status.
@@ -71,34 +74,16 @@ The Containers screen:
 - supports retry/refresh;
 - calculates container status counts from real API data;
 - supports the existing UI search/filter/table/grid behavior;
+- executes start, stop and restart actions through the API;
+- shows an in-progress state per container and prevents duplicate submissions;
+- confirms stop and restart operations and refreshes real state after completion;
 - does not fabricate metrics that the backend does not expose.
 
 ## The next task
 
-Continue from the existing Containers screen and implement **real container lifecycle actions** while preserving the existing UI.
+The next Containers milestone should build on the real lifecycle workflow with inspection, logs or metrics. Before adding an endpoint, inspect the existing backend implementation and frontend action handlers, and preserve the existing UI.
 
-Recommended first actions:
-
-```text
-POST /api/v1/containers/{id}/start
-POST /api/v1/containers/{id}/stop
-POST /api/v1/containers/{id}/restart
-```
-
-Before adding more endpoints, inspect the existing backend implementation and frontend action handlers. Reuse existing abstractions where possible.
-
-For each lifecycle operation:
-
-1. validate the container ID safely;
-2. execute the Docker operation through the backend;
-3. return a useful HTTP error when Docker rejects the operation;
-4. show a clear pending state in the UI;
-5. prevent accidental duplicate submissions;
-6. refresh/reconcile the container state after success;
-7. show a useful failure state without losing the rest of the page;
-8. use confirmation for disruptive/destructive operations where appropriate.
-
-Do not implement the operation as a frontend-only state mutation or toast simulation.
+All future infrastructure actions should follow the same pattern: validate the target in the backend, execute through a Go adapter, return useful errors, show a pending state, prevent duplicates, reconcile real state after success and use confirmation for disruptive operations.
 
 ## What to do before coding
 

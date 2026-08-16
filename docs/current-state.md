@@ -1,6 +1,6 @@
 # Current State
 
-Last known working milestone: **real Docker container data is visible in the Figma-designed Containers UI**.
+Last known working milestone: **the Figma-designed Containers UI displays real Docker data and performs real start, stop and restart operations**.
 
 ## Repository
 
@@ -75,7 +75,7 @@ GET /api/v1/containers
 
 It returns real Docker containers with fields including IDs, names, images, state/status, creation time, published ports and networks.
 
-The frontend currently adapts this API response to the UI's container model. Values not exposed by the backend are not fabricated.
+The frontend currently adapts this API response to the UI's container model. Values not exposed by the backend are not fabricated. Container start, stop and restart actions call the SCP API, show a pending state per container, prevent duplicate submissions and refresh the real Docker state after completion.
 
 ## Real integration environment
 
@@ -123,7 +123,15 @@ The Containers view now displays real containers from the server.
 
 ## What is not finished
 
-Container lifecycle actions are not yet fully wired to Docker as a complete production workflow. The next milestone is to implement real container actions such as start, stop and restart through the Go API and connect them to the existing UI.
+The Containers workflow supports real lifecycle actions through the Go API:
+
+```text
+POST /api/v1/containers/{id}/start
+POST /api/v1/containers/{id}/stop
+POST /api/v1/containers/{id}/restart
+```
+
+Stop and restart require confirmation in the UI. The API validates container IDs for lifecycle operations and returns Docker errors to the client. The next Containers milestone should extend the real workflow with inspection, logs, metrics and other operational details rather than simulated actions.
 
 CPU, memory, restart count and other richer operational data may still require additional backend endpoints/inspection/metrics work. Do not fake these values.
 

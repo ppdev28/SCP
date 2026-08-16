@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -43,6 +44,8 @@ type Port struct {
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
+
+var containerIDPattern = regexp.MustCompile(`^[a-fA-F0-9]{12,64}$`)
 
 func main() {
 	level := new(slog.LevelVar)
@@ -176,6 +179,10 @@ func (a *API) restartContainer(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) containerAction(w http.ResponseWriter, r *http.Request, action func(context.Context, string) error) {
 	id := r.PathValue("id")
+	if !containerIDPattern.MatchString(id) {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid container ID"})
+		return
+	}
 	if err := action(r.Context(), id); err != nil {
 		status := http.StatusBadGateway
 		if errdefs.IsNotFound(err) {

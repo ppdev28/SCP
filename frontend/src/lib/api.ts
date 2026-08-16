@@ -18,6 +18,13 @@ type ApiContainer = {
   networks?: string[]
 }
 
+export type ContainerAction = 'start' | 'stop' | 'restart'
+
+type ApiActionResponse = {
+  ok: boolean
+  id: string
+}
+
 const apiBase = '/api/v1'
 
 function mapStatus(state: string): ContainerStatus {
@@ -86,10 +93,11 @@ function toContainer(container: ApiContainer): Container {
   }
 }
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${apiBase}${path}`)
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${apiBase}${path}`, init)
   if (!response.ok) {
-    throw new Error(`SCP API returned ${response.status}`)
+    const body = await response.json().catch(() => null) as { error?: string } | null
+    throw new Error(body?.error || `SCP API returned ${response.status}`)
   }
   return response.json() as Promise<T>
 }
@@ -97,4 +105,14 @@ async function request<T>(path: string): Promise<T> {
 export async function getContainers(): Promise<Container[]> {
   const containers = await request<ApiContainer[]>('/containers')
   return containers.map(toContainer)
+}
+
+export async function runContainerAction(id: string, action: ContainerAction): Promise<void> {
+  const response = await request<ApiActionResponse>(`/containers/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST',
+  })
+
+  if (!response.ok || response.id !== id) {
+    throw new Error('SCP API returned an invalid container action response')
+  }
 }

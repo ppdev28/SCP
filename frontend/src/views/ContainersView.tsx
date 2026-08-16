@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Box, Plus, Grid, List, MoreHorizontal, Play, Square, RotateCw, Pause, FileText, Terminal, Trash2, Search, RefreshCw, AlertTriangle } from 'lucide-react'
 import { T } from '../lib/tokens'
-import { getContainers } from '../lib/api'
+import { getContainers, runContainerAction, type ContainerAction } from '../lib/api'
 import type { Container, ConfirmDialog } from '../lib/types'
 import { Card, StatusBadge, HealthBadge, Btn, Th, Td, EmptyState, FilterToggle, Input } from '../components/ui'
 
@@ -56,6 +56,7 @@ export default function ContainersView({ onDetail, addToast, onConfirm }:{onDeta
   const [gridView,setGridView]=useState(false)
   const [ctx,setCtx]=useState<{x:number;y:number;c:Container}|null>(null)
   const [selected,setSelected]=useState<Set<string>>(new Set())
+  const [pendingActions,setPendingActions]=useState<Map<string,ContainerAction>>(new Map())
 
   const loadContainers=useCallback(async()=>{
     setLoading(true);setError(null)
@@ -66,6 +67,11 @@ export default function ContainersView({ onDetail, addToast, onConfirm }:{onDeta
 
   useEffect(()=>{ void loadContainers() },[loadContainers])
 
+  const refreshAfterAction=async()=>{
+    try { setContainers(await getContainers()) }
+    catch (err) { addToast(`Action completed, but the container list could not refresh: ${err instanceof Error ? err.message : 'unknown error'}`,'error') }
+  }
+
   const rows=containers.filter(c=>{
     const q=search.toLowerCase()
     return (c.name.toLowerCase().includes(q)||c.image.toLowerCase().includes(q)) && (filter==='all'||c.status===filter)
@@ -74,9 +80,53 @@ export default function ContainersView({ onDetail, addToast, onConfirm }:{onDeta
   const stopped=containers.filter(c=>c.status==='stopped').length
   const restarting=containers.filter(c=>c.status==='restarting').length
 
+  const executeContainerAction=async(action:ContainerAction,c:Container)=>{
+    if(pendingActions.has(c.id)) return
+    setPendingActions(previous=>new Map(previous).set(c.id,action))
+    try {
+      await runContainerAction(c.id,action)
+      await refreshAfterAction()
+      const pastTense:Record<ContainerAction,string>={start:'started',stop:'stopped',restart:'restarted'}
+      addToast(`${c.name} ${pastTense[action]}`,'success')
+    } catch (err) {
+      addToast(`Unable to ${action} ${c.name}: ${err instanceof Error ? err.message : 'unknown error'}`,'error')
+    } finally {
+      setPendingActions(previous=>{
+        const next=new Map(previous)
+        next.delete(c.id)
+        return next
+      })
+    }
+  }
+
+  const executeSelectedStops=async()=>{
+    const targets=containers.filter(c=>selected.has(c.id)&&c.status==='running')
+    if(targets.length===0) return
+    setPendingActions(previous=>{
+      const next=new Map(previous)
+      targets.forEach(c=>next.set(c.id,'stop'))
+      return next
+    })
+    try {
+      const results=await Promise.allSettled(targets.map(c=>runContainerAction(c.id,'stop')))
+      await refreshAfterAction()
+      const failed=results.filter(result=>result.status==='rejected').length
+      addToast(failed===0?`Stopped ${targets.length} containers`:`Stopped ${targets.length-failed} of ${targets.length} containers` ,failed===0?'success':'error')
+    } finally {
+      setPendingActions(previous=>{
+        const next=new Map(previous)
+        targets.forEach(c=>next.delete(c.id))
+        return next
+      })
+      setSelected(new Set())
+    }
+  }
+
   const handleAction=(action:string,c:Container)=>{
+    if(action==='start') { void executeContainerAction('start',c); return }
+    if(action==='stop') { onConfirm({title:`Stop "${c.name}"?`,message:'The container will be stopped. You can restart it at any time.',action:'Stop container',danger:true,onConfirm:()=>void executeContainerAction('stop',c)}); return }
+    if(action==='restart') { onConfirm({title:`Restart "${c.name}"?`,message:'The container will be briefly unavailable while Docker restarts it.',action:'Restart container',onConfirm:()=>void executeContainerAction('restart',c)}); return }
     if(action==='delete') onConfirm({title:`Delete container "${c.name}"?`,message:'This will permanently remove the container and its writable layer. Volumes will not be deleted.',action:'Delete container',danger:true,onConfirm:()=>addToast(`Deleted ${c.name}`,'error')})
-    else if(action==='stop') onConfirm({title:`Stop "${c.name}"?`,message:'The container will be stopped. You can restart it at any time.',action:'Stop container',onConfirm:()=>addToast(`Stopping ${c.name}…`,'info')})
     else { const msgs:Record<string,string>={start:`Starting ${c.name}…`,restart:`Restarting ${c.name}…`,pause:`Pausing ${c.name}…`,logs:`Opening logs for ${c.name}`,terminal:`Connecting to ${c.name}…`,inspect:`Inspecting ${c.name}`};addToast(msgs[action]||action,'info') }
   }
 
@@ -94,16 +144,16 @@ export default function ContainersView({ onDetail, addToast, onConfirm }:{onDeta
       <div style={{display:'flex',background:T.raised,border:`1px solid ${T.border}`,borderRadius:7,overflow:'hidden'}}><button onClick={()=>setGridView(false)} style={{padding:'0 10px',height:32,background:!gridView?T.active:'none',border:'none',cursor:'pointer',color:!gridView?T.text:T.textDim,display:'flex',alignItems:'center'}}><List size={13}/></button><button onClick={()=>setGridView(true)} style={{padding:'0 10px',height:32,background:gridView?T.active:'none',border:'none',cursor:'pointer',color:gridView?T.text:T.textDim,display:'flex',alignItems:'center'}}><Grid size={13}/></button></div>
       <div style={{flex:1}}/>
       <Btn icon={<RefreshCw size={11}/>} onClick={()=>void loadContainers()}>Refresh</Btn>
-      {selected.size>0&&<Btn onClick={()=>onConfirm({title:`Stop ${selected.size} containers?`,message:'All selected running containers will be stopped.',action:'Stop all',onConfirm:()=>{addToast(`Stopped ${selected.size} containers`,'warning');setSelected(new Set())}})} variant="danger" icon={<Square size={11}/>}>Stop {selected.size}</Btn>}
+      {selected.size>0&&<Btn onClick={()=>onConfirm({title:`Stop ${selected.size} containers?`,message:'All selected running containers will be stopped.',action:'Stop all',danger:true,onConfirm:()=>void executeSelectedStops()})} variant="danger" icon={<Square size={11}/>}>Stop {selected.size}</Btn>}
       <Btn icon={<Plus size={11}/>} variant="primary" onClick={()=>addToast('Create container — use "container-create" route','info')}>Create container</Btn>
     </div>
 
     {loading ? <Card><div style={{padding:40,textAlign:'center',color:T.textDim,fontSize:12}}>Loading containers…</div></Card> : error ? <Card><div style={{padding:40,textAlign:'center'}}><AlertTriangle size={24} color={T.yellow}/><div style={{marginTop:10,color:T.text,fontSize:13,fontWeight:600}}>Unable to load containers</div><div style={{marginTop:5,color:T.textDim,fontSize:12}}>{error}</div><div style={{marginTop:14}}><Btn icon={<RefreshCw size={11}/>} onClick={()=>void loadContainers()}>Retry</Btn></div></div></Card> : gridView ? (rows.length>0 ? <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>{rows.map(c=><GridCard key={c.id} c={c} onClick={onDetail}/>)}</div> : <Card><EmptyState icon={<Box size={28}/>} title="No containers found" sub="Adjust your search or filter criteria."/></Card>) : <Card>
       <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',minWidth:760}}><thead><tr style={{background:T.bg}}><th style={{width:40,padding:'8px 14px',borderBottom:`1px solid ${T.border}`}}><input type="checkbox" checked={rows.length>0&&rows.every(c=>selected.has(c.id))} onChange={toggleAll} style={{accentColor:T.accent,cursor:'pointer'}}/></th><Th>Name</Th><Th>Image</Th><Th>Status</Th><Th>Health</Th><Th mono>CPU</Th><Th mono>Memory</Th><Th mono>Ports</Th><Th>Uptime</Th><Th right>Restarts</Th><Th></Th></tr></thead><tbody>
-        {rows.map(c=><tr key={c.id} onContextMenu={e=>{e.preventDefault();setCtx({x:e.clientX,y:e.clientY,c})}} onClick={onDetail} style={{cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.background=T.hover} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+        {rows.map(c=>{const pendingAction=pendingActions.get(c.id);return <tr key={c.id} onContextMenu={e=>{e.preventDefault();setCtx({x:e.clientX,y:e.clientY,c})}} onClick={onDetail} style={{cursor:pendingAction?'wait':'pointer',opacity:pendingAction?0.6:1}} onMouseEnter={e=>e.currentTarget.style.background=T.hover} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
           <td style={{padding:'9px 14px',borderBottom:`1px solid ${T.borderMuted}`}} onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selected.has(c.id)} onChange={()=>setSelected(prev=>{const s=new Set(prev);s.has(c.id)?s.delete(c.id):s.add(c.id);return s})} style={{accentColor:T.accent,cursor:'pointer'}}/></td>
-          <Td><span style={{fontWeight:700,color:T.text,fontFamily:'JetBrains Mono,monospace',fontSize:12}}>{c.name}</span></Td><Td mono dim>{c.image}</Td><Td><StatusBadge status={c.status}/></Td><Td><HealthBadge health={c.health}/></Td><Td mono dim>{c.cpu}</Td><Td mono dim>{c.memory}</Td><Td mono dim>{c.ports}</Td><Td dim>{c.uptime}</Td><Td right><span style={{fontSize:11,fontFamily:'JetBrains Mono,monospace',color:c.restarts>2?T.yellow:T.textDim}}>{c.restarts}</span></Td><Td style={{textAlign:'right'}}><button onClick={e=>{e.stopPropagation();setCtx({x:e.clientX,y:e.clientY,c})}} style={{background:'none',border:'none',cursor:'pointer',color:T.textDim,padding:'2px 4px',borderRadius:5,display:'inline-flex'}}><MoreHorizontal size={14}/></button></Td>
-        </tr>)}
+          <Td><span style={{fontWeight:700,color:T.text,fontFamily:'JetBrains Mono,monospace',fontSize:12}}>{c.name}</span></Td><Td mono dim>{c.image}</Td><Td><StatusBadge status={c.status}/></Td><Td><HealthBadge health={c.health}/></Td><Td mono dim>{c.cpu}</Td><Td mono dim>{c.memory}</Td><Td mono dim>{c.ports}</Td><Td dim>{c.uptime}</Td><Td right><span style={{fontSize:11,fontFamily:'JetBrains Mono,monospace',color:c.restarts>2?T.yellow:T.textDim}}>{c.restarts}</span></Td><Td style={{textAlign:'right'}}>{pendingAction?<span style={{fontSize:11,color:T.accent}}>{pendingAction[0].toUpperCase()}{pendingAction.slice(1)}ing…</span>:<button onClick={e=>{e.stopPropagation();setCtx({x:e.clientX,y:e.clientY,c})}} style={{background:'none',border:'none',cursor:'pointer',color:T.textDim,padding:'2px 4px',borderRadius:5,display:'inline-flex'}}><MoreHorizontal size={14}/></button>}</Td>
+        </tr>})}
       </tbody></table></div>
       {rows.length===0&&<EmptyState icon={<Box size={28}/>} title="No containers found" sub="Adjust your search or filter criteria."/>}
     </Card>}
