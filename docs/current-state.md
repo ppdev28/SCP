@@ -1,6 +1,6 @@
 # Current State
 
-Last known working milestone: **the Figma-designed Containers UI displays real Docker data and performs real start, stop and restart operations**.
+Last known working milestone: **the Figma-designed Containers UI displays real Docker data and performs tested start, stop and restart operations against the Ubuntu Server Docker Engine**.
 
 ## Repository
 
@@ -120,6 +120,8 @@ Browser
 ```
 
 The Containers view now displays real containers from the server.
+
+The lifecycle workflow has also been manually validated against Docker on the Ubuntu Server: start, stop and restart operations update the UI and reconcile with the real container state, including stopping and starting a disposable test container.
 
 ## What is not finished
 

@@ -22,7 +22,7 @@ feature/project-foundation
 
 The latest important milestone is:
 
-> The Containers view displays real containers and executes real start, stop and restart operations against the developer's Ubuntu Server Docker Engine through the SCP Go API.
+> The Containers view displays real containers and its start, stop and restart operations have been manually verified against the developer's Ubuntu Server Docker Engine through the SCP Go API.
 
 ## Current architecture
 
