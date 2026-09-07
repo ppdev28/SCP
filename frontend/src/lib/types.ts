@@ -1,6 +1,6 @@
 export type View =
   | 'dashboard'
-  | 'containers' | 'container-detail' | 'container-create'
+  | 'host' | 'containers' | 'container-detail' | 'container-create'
   | 'applications' | 'app-detail'
   | 'services'
   | 'storage'
@@ -35,6 +35,38 @@ export interface Container {
   networkMode: string
   ip: string
   mac: string
+}
+
+export interface HostOverview {
+  hostname: string
+  os: {
+    name: string
+    version: string
+    kernel: string
+    architecture: string
+  }
+  uptimeSeconds: number
+  load: {
+    load1: number
+    load5: number
+    load15: number
+  }
+  cpu: {
+    cores: number
+    usagePercent: number
+  }
+  memory: {
+    totalBytes: number
+    usedBytes: number
+    availableBytes: number
+    usagePercent: number
+  }
+  disk: {
+    totalBytes: number
+    usedBytes: number
+    availableBytes: number
+    usagePercent: number
+  }
 }
 
 export interface AppService {
