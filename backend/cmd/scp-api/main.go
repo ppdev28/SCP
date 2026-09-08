@@ -20,7 +20,6 @@ import (
 )
 
 type API struct { docker *client.Client }
-
 type ContainerSummary struct { ID string `json:"id"`; Name string `json:"name"`; Image string `json:"image"`; State string `json:"state"`; Status string `json:"status"`; CreatedAt int64 `json:"createdAt"`; Ports []Port `json:"ports"`; Networks []string `json:"networks"` }
 type Port struct { PrivatePort uint16 `json:"privatePort"`; PublicPort uint16 `json:"publicPort,omitempty"`; Type string `json:"type"`; IP string `json:"ip,omitempty"` }
 type ErrorResponse struct { Error string `json:"error"` }
@@ -39,15 +38,23 @@ func main() {
 	mux.HandleFunc("POST /api/v1/containers/{id}/start", api.startContainer)
 	mux.HandleFunc("POST /api/v1/containers/{id}/stop", api.stopContainer)
 	mux.HandleFunc("POST /api/v1/containers/{id}/restart", api.restartContainer)
+	mux.HandleFunc("GET /api/v1/services", api.listServices)
+	mux.HandleFunc("POST /api/v1/services/{name}/start", api.startService)
+	mux.HandleFunc("POST /api/v1/services/{name}/stop", api.stopService)
+	mux.HandleFunc("POST /api/v1/services/{name}/restart", api.restartService)
 	port := envInt("SCP_PORT", 8080)
 	server := &http.Server{Addr: ":"+strconv.Itoa(port), Handler: withCORS(withLogging(mux)), ReadHeaderTimeout:5*time.Second, ReadTimeout:15*time.Second, WriteTimeout:30*time.Second, IdleTimeout:60*time.Second}
 	go func(){ <-ctx.Done(); shutdownCtx,cancel:=context.WithTimeout(context.Background(),5*time.Second); defer cancel(); _=server.Shutdown(shutdownCtx) }()
 	logger.Info("SCP API listening", "addr", server.Addr)
 	if err:=server.ListenAndServe(); err!=nil && !errors.Is(err,http.ErrServerClosed){logger.Error("HTTP server stopped","error",err);os.Exit(1)}
 }
-
 func (a *API) health(w http.ResponseWriter,r *http.Request){ctx,cancel:=context.WithTimeout(r.Context(),3*time.Second);defer cancel();if _,err:=a.docker.Ping(ctx,client.PingOptions{});err!=nil{writeJSON(w,http.StatusServiceUnavailable,map[string]any{"status":"degraded","docker":"unavailable"});return};writeJSON(w,http.StatusOK,map[string]any{"status":"ok","docker":"available"})}
 func (a *API) host(w http.ResponseWriter,r *http.Request){overview,err:=collectHostOverview();if err!=nil{writeError(w,http.StatusInternalServerError,err);return};writeJSON(w,http.StatusOK,overview)}
+func (a *API) listServices(w http.ResponseWriter,r *http.Request){services,err:=collectServices(r.Context());if err!=nil{writeError(w,http.StatusBadGateway,err);return};writeJSON(w,http.StatusOK,services)}
+func (a *API) startService(w http.ResponseWriter,r *http.Request){a.serviceAction(w,r,"start")}
+func (a *API) stopService(w http.ResponseWriter,r *http.Request){a.serviceAction(w,r,"stop")}
+func (a *API) restartService(w http.ResponseWriter,r *http.Request){a.serviceAction(w,r,"restart")}
+func (a *API) serviceAction(w http.ResponseWriter,r *http.Request,action string){name:=r.PathValue("name");if !systemdUnitPattern.MatchString(name){writeJSON(w,http.StatusBadRequest,ErrorResponse{Error:"invalid systemd service name"});return};if err:=serviceAction(r.Context(),name,action);err!=nil{writeError(w,http.StatusBadGateway,err);return};writeJSON(w,http.StatusOK,map[string]any{"ok":true,"name":name,"action":action})}
 func (a *API) listContainers(w http.ResponseWriter,r *http.Request){result,err:=a.docker.ContainerList(r.Context(),client.ContainerListOptions{All:true});if err!=nil{writeError(w,http.StatusBadGateway,err);return};containers:=result.Items;response:=make([]ContainerSummary,0,len(containers));for _,c:=range containers{response=append(response,summarizeContainer(c))};writeJSON(w,http.StatusOK,response)}
 func (a *API) getContainer(w http.ResponseWriter,r *http.Request){id:=r.PathValue("id");result,err:=a.docker.ContainerInspect(r.Context(),id,client.ContainerInspectOptions{});if err!=nil{status:=http.StatusBadGateway;if errdefs.IsNotFound(err){status=http.StatusNotFound};writeError(w,status,err);return};c:=result.Container;response:=map[string]any{"id":c.ID,"name":strings.TrimPrefix(c.Name,"/"),"image":c.Config.Image,"state":c.State.Status,"created":c.Created,"config":map[string]any{"env":c.Config.Env,"cmd":c.Config.Cmd,"entrypoint":c.Config.Entrypoint,"workingDir":c.Config.WorkingDir},"restartPolicy":c.HostConfig.RestartPolicy.Name,"mounts":c.Mounts,"networks":c.NetworkSettings.Networks,"ports":c.NetworkSettings.Ports,"labels":c.Config.Labels};writeJSON(w,http.StatusOK,response)}
 func (a *API) startContainer(w http.ResponseWriter,r *http.Request){a.containerAction(w,r,func(ctx context.Context,id string)error{_,err:=a.docker.ContainerStart(ctx,id,client.ContainerStartOptions{});return err})}
