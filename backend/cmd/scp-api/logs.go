@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
 
@@ -22,9 +21,9 @@ type LogEntry struct {
 }
 
 type LogsOverview struct {
-	Entries []LogEntry `json:"entries"`
-	Sources []string   `json:"sources"`
-	UpdatedAt string   `json:"updatedAt"`
+	Entries   []LogEntry `json:"entries"`
+	Sources   []string   `json:"sources"`
+	UpdatedAt string     `json:"updatedAt"`
 }
 
 func collectLogs(ctx context.Context, docker *client.Client) (LogsOverview, error) {
@@ -39,7 +38,10 @@ func collectLogs(ctx context.Context, docker *client.Client) (LogsOverview, erro
 		return LogsOverview{}, err
 	}
 	for _, item := range containers.Items {
-		name := strings.TrimPrefix(item.Names[0], "/")
+		name := item.ID
+		if len(item.Names) > 0 {
+			name = strings.TrimPrefix(item.Names[0], "/")
+		}
 		if name == "" {
 			name = item.ID[:minInt(12, len(item.ID))]
 		}
@@ -105,16 +107,13 @@ func collectContainerLogs(ctx context.Context, docker *client.Client, id, name s
 	}
 
 	entries := make([]LogEntry, 0, 100)
-	// Docker multiplexes stdout/stderr for non-TTY containers with an 8-byte header.
 	for len(data) >= 8 {
-		streamType := data[0]
 		size := int(binary.BigEndian.Uint32(data[4:8]))
 		if size < 0 || size > len(data)-8 {
 			break
 		}
 		payload := string(data[8 : 8+size])
 		data = data[8+size:]
-		_ = streamType
 		parseContainerLogPayload(payload, name, &entries)
 	}
 	if len(entries) == 0 && len(data) > 0 {
@@ -158,4 +157,7 @@ func inferLogLevel(message string) string {
 	}
 }
 
-var _ container.Summary
+func minInt(a, b int) int {
+	if a < b { return a }
+	return b
+}
