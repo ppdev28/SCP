@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Network, RefreshCw, AlertTriangle, ArrowDown, ArrowUp, Router, Server } from 'lucide-react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { RefreshCw, AlertTriangle, ArrowDown, ArrowUp, Router, Server } from 'lucide-react'
 import { T } from '../lib/tokens'
 import { getNetwork } from '../lib/api'
 import type { NetworkOverview } from '../lib/types'
@@ -11,7 +11,7 @@ function bytes(value:number) {
   return `${(value/1024**i).toFixed(i>1?1:0)} ${units[i]}`
 }
 
-function TopoNode({ label, sub, color=T.border, icon }: { label:string; sub?:string; color?:string; icon?:React.ReactNode }) {
+function TopoNode({ label, sub, color=T.border, icon }: { label:string; sub?:string; color?:string; icon?:ReactNode }) {
   return <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
     <div style={{padding:'9px 16px',background:T.raised,border:`1px solid ${color}`,borderRadius:8,textAlign:'center',minWidth:135}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,fontSize:12,fontWeight:600,color:T.text}}>{icon}{label}</div>
