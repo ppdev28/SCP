@@ -1,4 +1,4 @@
-import type { Container, ContainerStatus, HealthStatus, HostOverview, SystemService } from './types'
+import type { Container, ContainerStatus, HealthStatus, HostOverview, StorageOverview, SystemService } from './types'
 
 type ApiPort = { privatePort: number; publicPort?: number; type: string; ip?: string }
 type ApiContainer = { id: string; name: string; image: string; state: string; status: string; createdAt: number; ports?: ApiPort[]; networks?: string[] }
@@ -53,3 +53,4 @@ export async function runServiceAction(name: string, action: ServiceAction): Pro
   const response = await request<ApiServiceActionResponse>(`/services/${encodeURIComponent(name)}/${action}`, { method: 'POST' })
   if (!response.ok || response.name !== name || response.action !== action) throw new Error('SCP API returned an invalid service action response')
 }
+export async function getStorage(): Promise<StorageOverview> { return request<StorageOverview>('/storage') }
