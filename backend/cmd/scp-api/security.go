@@ -26,10 +26,10 @@ type SecuritySession struct {
 }
 
 type FirewallRule struct {
-	Number string `json:"number"`
-	To     string `json:"to"`
-	Action string `json:"action"`
-	From   string `json:"from"`
+	Number  string `json:"number"`
+	To      string `json:"to"`
+	Action  string `json:"action"`
+	From    string `json:"from"`
 	Comment string `json:"comment,omitempty"`
 }
 
@@ -58,7 +58,7 @@ func collectSecurity(ctx context.Context) (SecurityOverview, error) {
 	overview.FirewallRules = parseUFWRules(ufwStatus)
 
 	sshConfig, _ := runSecurityCommand(ctx, "sshd", "-T")
-	passwordAuth := configValue(sshConfig, "passwordauthentication")	
+	passwordAuth := configValue(sshConfig, "passwordauthentication")
 	rootLogin := configValue(sshConfig, "permitrootlogin")
 	keyOnly := strings.EqualFold(passwordAuth, "no")
 	rootDisabled := strings.EqualFold(rootLogin, "no") || strings.EqualFold(rootLogin, "prohibit-password")
@@ -69,8 +69,11 @@ func collectSecurity(ctx context.Context) (SecurityOverview, error) {
 	if fail2banOK {
 		fail2banDetail = "Active"
 		if jailLine := findLine(fail2banStatus, "Jail list"); jailLine != "" {
-			jails := strings.TrimSpace(strings.SplitN(jailLine, ":", 2)[1])
-			if jails != "" { fail2banDetail = "Active · " + strings.Count(jails, ",") + 1 |> strconv.Itoa + " jails" }
+			parts := strings.SplitN(jailLine, ":", 2)
+			if len(parts) == 2 {
+				jails := strings.TrimSpace(parts[1])
+				if jails != "" { fail2banDetail = fmt.Sprintf("Active · %d jails", strings.Count(jails, ",")+1) }
+			}
 		}
 	}
 
@@ -142,7 +145,6 @@ func parseUFWRules(status string) []FirewallRule {
 		if len(fields) < toIdx+3 { continue }
 		actionIdx := toIdx + 1
 		fromIdx := toIdx + 2
-		if actionIdx >= len(fields) || fromIdx >= len(fields) { continue }
 		rule := FirewallRule{To: fields[toIdx], Action: strings.ToUpper(fields[actionIdx]), From: strings.Join(fields[fromIdx:], " ")}
 		if toIdx == 1 { rule.Number = strings.TrimSuffix(strings.TrimSuffix(fields[0], ")"), "(") }
 		result = append(result, rule)
@@ -156,7 +158,8 @@ func collectSecuritySessions(ctx context.Context) []SecuritySession {
 	result := make([]SecuritySession, 0)
 	scanner := bufio.NewScanner(strings.NewReader(out))
 	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
+		line := scanner.Text()
+		fields := strings.Fields(line)
 		if len(fields) < 6 { continue }
 		pid := 0
 		for _, f := range fields {
@@ -164,7 +167,7 @@ func collectSecuritySessions(ctx context.Context) []SecuritySession {
 		}
 		if pid == 0 { continue }
 		from := "local"
-		if i := strings.LastIndex(scanner.Text(), "("); i >= 0 { from = strings.TrimSuffix(strings.TrimSpace(scanner.Text()[i+1:]), ")") }
+		if i := strings.LastIndex(line, "("); i >= 0 { from = strings.TrimSuffix(strings.TrimSpace(line[i+1:]), ")") }
 		since := fields[3]
 		if len(fields) > 4 { since += " " + fields[4] }
 		result = append(result, SecuritySession{User: fields[0], From: from, Since: since, Method: "session", PID: pid})
