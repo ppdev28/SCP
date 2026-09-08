@@ -39,34 +39,12 @@ export interface Container {
 
 export interface HostOverview {
   hostname: string
-  os: {
-    name: string
-    version: string
-    kernel: string
-    architecture: string
-  }
+  os: { name: string; version: string; kernel: string; architecture: string }
   uptimeSeconds: number
-  load: {
-    load1: number
-    load5: number
-    load15: number
-  }
-  cpu: {
-    cores: number
-    usagePercent: number
-  }
-  memory: {
-    totalBytes: number
-    usedBytes: number
-    availableBytes: number
-    usagePercent: number
-  }
-  disk: {
-    totalBytes: number
-    usedBytes: number
-    availableBytes: number
-    usagePercent: number
-  }
+  load: { load1: number; load5: number; load15: number }
+  cpu: { cores: number; usagePercent: number }
+  memory: { totalBytes: number; usedBytes: number; availableBytes: number; usagePercent: number }
+  disk: { totalBytes: number; usedBytes: number; availableBytes: number; usagePercent: number }
 }
 
 export interface AppService {
@@ -120,6 +98,43 @@ export interface StorageOverview {
   usagePercent: number
   disks: StorageDisk[]
   volumes: StorageVolume[]
+}
+
+export interface NetworkInterface {
+  name: string
+  ip: string
+  mac: string
+  state: string
+  speed: string
+  rxBytes: number
+  txBytes: number
+}
+
+export interface OpenPort {
+  port: number
+  proto: string
+  process: string
+  container: string
+  address: string
+  state: string
+}
+
+export interface NetworkContainer {
+  name: string
+  ip: string
+}
+
+export interface NetworkTopology {
+  gateway: string
+  host: string
+  dockerBridge: string
+  containers: NetworkContainer[]
+}
+
+export interface NetworkOverview {
+  interfaces: NetworkInterface[]
+  ports: OpenPort[]
+  topology: NetworkTopology
 }
 
 export interface Toast {
