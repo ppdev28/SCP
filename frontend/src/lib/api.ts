@@ -1,4 +1,4 @@
-import type { Container, ContainerStatus, HealthStatus, HostOverview, NetworkOverview, StorageOverview, SystemService, LogsOverview } from './types'
+import type { Container, ContainerStatus, HealthStatus, HostOverview, NetworkOverview, StorageOverview, SystemService } from './types'
 import type { MonitoringOverview } from './monitoring'
 
 type ApiPort = { privatePort: number; publicPort?: number; type: string; ip?: string }
@@ -8,6 +8,7 @@ type ApiContainerActionResponse = { ok: boolean; id: string }
 type ApiServiceActionResponse = { ok: boolean; name: string; action: string }
 export type ContainerAction = 'start' | 'stop' | 'restart'
 export type ServiceAction = 'start' | 'stop' | 'restart'
+export interface TerminalExecResponse { output: string; exitCode: number; cwd: string }
 const apiBase = '/api/v1'
 function mapStatus(state: string): ContainerStatus { switch (state.toLowerCase()) { case 'running': return 'running'; case 'paused': return 'paused'; case 'restarting': return 'restarting'; case 'created': case 'exited': case 'dead': return 'stopped'; default: return 'exited' } }
 function mapHealth(status: string): HealthStatus { const normalized = status.toLowerCase(); if (normalized.includes('(healthy)')) return 'healthy'; if (normalized.includes('(unhealthy)')) return 'unhealthy'; if (normalized.includes('(health: starting)')) return 'starting'; return 'none' }
@@ -24,4 +25,5 @@ export async function runServiceAction(name: string, action: ServiceAction): Pro
 export async function getStorage(): Promise<StorageOverview> { return request<StorageOverview>('/storage') }
 export async function getNetwork(): Promise<NetworkOverview> { return request<NetworkOverview>('/network') }
 export async function getMonitoring(): Promise<MonitoringOverview> { return request<MonitoringOverview>('/monitoring') }
-export async function getLogs(): Promise<LogsOverview> { return request<LogsOverview>('/logs') }
+export async function getLogs(): Promise<{ entries: Array<{ timestamp: string; level: string; source: string; message: string }>; sources: string[]; updatedAt: string }> { return request('/logs') }
+export async function execTerminal(command: string, cwd?: string): Promise<TerminalExecResponse> { return request<TerminalExecResponse>('/terminal/exec', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command, cwd }) }) }
