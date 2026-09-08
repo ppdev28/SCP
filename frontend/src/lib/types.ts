@@ -150,6 +150,44 @@ export interface LogsOverview {
   updatedAt: string
 }
 
+export interface SecurityCheck {
+  label: string
+  ok: boolean | null
+  detail: string
+}
+
+export interface SecuritySession {
+  user: string
+  from: string
+  since: string
+  method: string
+  pid: number
+}
+
+export interface FirewallRule {
+  number: string
+  to: string
+  action: string
+  from: string
+  comment?: string
+}
+
+export interface SecurityEvent {
+  timestamp: string
+  type: string
+  message: string
+}
+
+export interface SecurityOverview {
+  updatedAt: string
+  checks: SecurityCheck[]
+  sessions: SecuritySession[]
+  firewallActive: boolean
+  firewallRules: FirewallRule[]
+  firewallVersion: string
+  events: SecurityEvent[]
+}
+
 export interface Toast {
   id: string
   message: string
