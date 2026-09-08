@@ -36,12 +36,12 @@ export default function ServicesView({ addToast, onConfirm }:{ addToast:(m:strin
   }), [services])
 
   const action = (service:SystemService, operation:ServiceAction) => {
-    const verb = operation === 'start' ? 'Start' : operation === 'stop' ? 'Stop' : 'Restart'
+    const verb = operation === 'start' ? 'Started' : operation === 'stop' ? 'Stopped' : 'Restarted'
     const execute = async () => {
       setPending(`${service.name}:${operation}`)
       try {
         await runServiceAction(service.name, operation)
-        addToast(`${verb}ed ${service.name}`, 'success')
+        addToast(`${verb} ${service.name}`, 'success')
         await load(true)
       } catch (err) {
         addToast(err instanceof Error ? err.message : `Failed to ${operation} ${service.name}`, 'error')
@@ -58,20 +58,12 @@ export default function ServicesView({ addToast, onConfirm }:{ addToast:(m:strin
   return (
     <div style={{padding:'22px 24px'}}>
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:16,marginBottom:18}}>
-        <div>
-          <h1 style={{fontSize:17,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Services</h1>
-          <p style={{fontSize:12,color:T.textDim,marginTop:2}}>systemd units and background services running on this server.</p>
-        </div>
+        <div><h1 style={{fontSize:17,fontWeight:700,color:T.text,letterSpacing:'-0.02em'}}>Services</h1><p style={{fontSize:12,color:T.textDim,marginTop:2}}>systemd units and background services running on this server.</p></div>
         <Btn size="sm" variant="secondary" icon={<RefreshCw size={12} className={refreshing?'spin':''}/>} onClick={()=>void load(true)} disabled={loading||refreshing}>Refresh</Btn>
       </div>
 
       <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
-        {[{label:'Active',value:counts.active,color:T.green},{label:'Inactive',value:counts.inactive,color:T.textDim},{label:'Failed',value:counts.failed,color:T.red}].map(s=>(
-          <div key={s.label} style={{padding:'8px 14px',background:T.raised,border:`1px solid ${T.border}`,borderRadius:8,display:'flex',gap:8,alignItems:'baseline'}}>
-            <span style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:'JetBrains Mono,monospace',lineHeight:1}}>{s.value}</span>
-            <span style={{fontSize:11,color:T.textDim,textTransform:'uppercase',letterSpacing:'0.05em'}}>{s.label}</span>
-          </div>
-        ))}
+        {[{label:'Active',value:counts.active,color:T.green},{label:'Inactive',value:counts.inactive,color:T.textDim},{label:'Failed',value:counts.failed,color:T.red}].map(s=><div key={s.label} style={{padding:'8px 14px',background:T.raised,border:`1px solid ${T.border}`,borderRadius:8,display:'flex',gap:8,alignItems:'baseline'}}><span style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:'JetBrains Mono,monospace',lineHeight:1}}>{s.value}</span><span style={{fontSize:11,color:T.textDim,textTransform:'uppercase',letterSpacing:'0.05em'}}>{s.label}</span></div>)}
       </div>
 
       <div style={{display:'flex',gap:8,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
@@ -79,11 +71,7 @@ export default function ServicesView({ addToast, onConfirm }:{ addToast:(m:strin
         <FilterToggle options={[{label:'All',value:'all'},{label:'Active',value:'active'},{label:'Inactive',value:'inactive'},{label:'Failed',value:'failed'}]} value={filter} onChange={setFilter}/>
       </div>
 
-      {error && (
-        <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',marginBottom:12,background:`${T.red}0d`,border:`1px solid ${T.red}35`,borderRadius:8,color:T.red,fontSize:12}}>
-          <AlertTriangle size={14}/><span style={{flex:1}}>{error}</span><Btn size="xs" variant="secondary" onClick={()=>void load()}>Retry</Btn>
-        </div>
-      )}
+      {error && <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 12px',marginBottom:12,background:`${T.red}0d`,border:`1px solid ${T.red}35`,borderRadius:8,color:T.red,fontSize:12}}><AlertTriangle size={14}/><span style={{flex:1}}>{error}</span><Btn size="xs" variant="secondary" onClick={()=>void load()}>Retry</Btn></div>}
 
       <Card>
         <div style={{overflowX:'auto'}}>
@@ -91,19 +79,17 @@ export default function ServicesView({ addToast, onConfirm }:{ addToast:(m:strin
             <thead><tr style={{background:T.bg}}><Th>Name</Th><Th>Description</Th><Th>Status</Th><Th>Enabled</Th><Th mono>CPU time</Th><Th mono>Memory</Th><Th>Uptime</Th><Th></Th></tr></thead>
             <tbody>
               {loading && !services.length && Array.from({length:6}).map((_,i)=><tr key={i}><Td><span className="skeleton" style={{width:130,height:12,display:'block'}}/></Td><Td><span className="skeleton" style={{width:180,height:12,display:'block'}}/></Td><Td><span className="skeleton" style={{width:60,height:12,display:'block'}}/></Td><Td><span className="skeleton" style={{width:55,height:12,display:'block'}}/></Td><Td mono><span className="skeleton" style={{width:45,height:12,display:'block'}}/></Td><Td mono><span className="skeleton" style={{width:55,height:12,display:'block'}}/></Td><Td><span className="skeleton" style={{width:55,height:12,display:'block'}}/></Td><Td/></tr>)}
-              {!loading && rows.map(s=>(
-                <tr key={s.id} style={{cursor:'default'}} onMouseEnter={e=>e.currentTarget.style.background=T.hover} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                  <Td><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:12,fontWeight:600,color:T.text}}>{s.name}</span></Td>
-                  <Td dim>{s.description || '—'}</Td>
-                  <Td><span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:6,height:6,borderRadius:'50%',background:statusColor(s.status),flexShrink:0}}/><span style={{fontSize:11,fontWeight:600,color:statusColor(s.status),textTransform:'capitalize'}}>{s.status}</span></span></Td>
-                  <Td><span style={{fontSize:11,fontWeight:600,color:s.enabled?T.green:T.textDim}}>{s.enabled?'Enabled':'Disabled'}</span></Td>
-                  <Td mono dim>{s.cpu}</Td><Td mono dim>{s.memory}</Td><Td dim>{s.uptime}</Td>
-                  <Td><div style={{display:'flex',gap:4}}>
-                    {s.status==='active' ? <Btn size="xs" variant="danger" icon={<Square size={10}/>} disabled={pending!==null} loading={busy(s.name,'stop')} onClick={()=>action(s,'stop')}/> : <Btn size="xs" variant="secondary" icon={<Play size={10}/>} disabled={pending!==null} loading={busy(s.name,'start')} onClick={()=>action(s,'start')}/>} 
-                    <Btn size="xs" variant="secondary" icon={<RotateCw size={10}/>} disabled={pending!==null} loading={busy(s.name,'restart')} onClick={()=>action(s,'restart')}/>
-                  </div></Td>
-                </tr>
-              ))}
+              {!loading && rows.map(s=><tr key={s.id} onMouseEnter={e=>e.currentTarget.style.background=T.hover} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                <Td><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:12,fontWeight:600,color:T.text}}>{s.name}</span></Td>
+                <Td dim>{s.description || '—'}</Td>
+                <Td><span style={{display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:6,height:6,borderRadius:'50%',background:statusColor(s.status)}}/><span style={{fontSize:11,fontWeight:600,color:statusColor(s.status),textTransform:'capitalize'}}>{s.status}</span></span></Td>
+                <Td><span style={{fontSize:11,fontWeight:600,color:s.enabled?T.green:T.textDim}}>{s.enabled?'Enabled':'Disabled'}</span></Td>
+                <Td mono dim>{s.cpu}</Td><Td mono dim>{s.memory}</Td><Td dim>{s.uptime}</Td>
+                <Td><div style={{display:'flex',gap:4}}>
+                  {s.status==='active' ? <Btn size="xs" variant="danger" icon={<Square size={10}/>} disabled={pending!==null} onClick={()=>action(s,'stop')}/> : <Btn size="xs" variant="secondary" icon={<Play size={10}/>} disabled={pending!==null} onClick={()=>action(s,'start')}/>} 
+                  <Btn size="xs" variant="secondary" icon={<RotateCw size={10}/>} disabled={pending!==null} onClick={()=>action(s,'restart')}/>
+                </div></Td>
+              </tr>)}
             </tbody>
           </table>
         </div>
