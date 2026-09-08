@@ -47,6 +47,9 @@ func main() {
 	mux.HandleFunc("GET /api/v1/monitoring", api.monitoring)
 	mux.HandleFunc("GET /api/v1/logs", api.logs)
 	mux.HandleFunc("POST /api/v1/terminal/exec", api.terminalExec)
+	mux.HandleFunc("GET /api/v1/security", api.security)
+	mux.HandleFunc("POST /api/v1/security/sessions/{pid}/terminate", api.terminateSecuritySession)
+	mux.HandleFunc("POST /api/v1/security/fix/{item}", api.fixSecurity)
 	port := envInt("SCP_PORT", 8080)
 	server := &http.Server{Addr: ":"+strconv.Itoa(port), Handler: withCORS(withLogging(mux)), ReadHeaderTimeout:5*time.Second, ReadTimeout:40*time.Second, WriteTimeout:45*time.Second, IdleTimeout:60*time.Second}
 	go func(){ <-ctx.Done(); shutdownCtx,cancel:=context.WithTimeout(context.Background(),5*time.Second); defer cancel(); _=server.Shutdown(shutdownCtx) }()
