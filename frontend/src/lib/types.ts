@@ -91,6 +91,37 @@ export interface SystemService {
   uptime: string
 }
 
+export interface StorageDisk {
+  device: string
+  model: string
+  capacityBytes: number
+  usedBytes: number
+  availableBytes: number
+  usagePercent: number
+  filesystem: string
+  mount: string
+  temperature: string
+  smart: string
+  type: string
+}
+
+export interface StorageVolume {
+  name: string
+  driver: string
+  mountpoint: string
+  sizeBytes: number
+  usedBytes: number
+}
+
+export interface StorageOverview {
+  totalCapacityBytes: number
+  usedBytes: number
+  availableBytes: number
+  usagePercent: number
+  disks: StorageDisk[]
+  volumes: StorageVolume[]
+}
+
 export interface Toast {
   id: string
   message: string
