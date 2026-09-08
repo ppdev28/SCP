@@ -1,4 +1,4 @@
-import type { Container, ContainerStatus, HealthStatus, HostOverview, NetworkOverview, StorageOverview, SystemService } from './types'
+import type { Container, ContainerStatus, HealthStatus, HostOverview, NetworkOverview, StorageOverview, SystemService, SecurityOverview } from './types'
 import type { MonitoringOverview } from './monitoring'
 
 type ApiPort = { privatePort: number; publicPort?: number; type: string; ip?: string }
@@ -26,4 +26,7 @@ export async function getStorage(): Promise<StorageOverview> { return request<St
 export async function getNetwork(): Promise<NetworkOverview> { return request<NetworkOverview>('/network') }
 export async function getMonitoring(): Promise<MonitoringOverview> { return request<MonitoringOverview>('/monitoring') }
 export async function getLogs(): Promise<{ entries: Array<{ timestamp: string; level: string; source: string; message: string }>; sources: string[]; updatedAt: string }> { return request('/logs') }
+export async function getSecurity(): Promise<SecurityOverview> { return request<SecurityOverview>('/security') }
+export async function terminateSecuritySession(pid: number): Promise<void> { const response = await request<{ ok: boolean; pid: number }>(`/security/sessions/${pid}/terminate`, { method: 'POST' }); if (!response.ok || response.pid !== pid) throw new Error('SCP API returned an invalid session response') }
+export async function fixSecurityItem(item: 'auto-updates'): Promise<void> { const response = await request<{ ok: boolean; item: string }>(`/security/fix/${item}`, { method: 'POST' }); if (!response.ok || response.item !== item) throw new Error('SCP API returned an invalid security fix response') }
 export async function execTerminal(command: string, cwd?: string): Promise<TerminalExecResponse> { return request<TerminalExecResponse>('/terminal/exec', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command, cwd }) }) }
