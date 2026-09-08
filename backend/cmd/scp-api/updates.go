@@ -53,7 +53,12 @@ func (a *API) applyUpdates(w http.ResponseWriter, r *http.Request) {
     displayPackages := append([]string(nil), packages...); if req.All { displayPackages = []string{"all available packages"} }
     ctx, cancel := context.WithTimeout(r.Context(), 20*time.Minute); defer cancel()
     var out string; var err error
-    if req.All { out, err = runUpdateCommand(ctx, "apt-get", "-y", "--with-new-pkgs", "upgrade") } else { out, err = runUpdateCommand(ctx, "apt-get", "-y", "--only-upgrade", "install", packages...) }
+    if req.All {
+        out, err = runUpdateCommand(ctx, "apt-get", "-y", "--with-new-pkgs", "upgrade")
+    } else {
+        args := append([]string{"-y", "--only-upgrade", "install"}, packages...)
+        out, err = runUpdateCommand(ctx, "apt-get", args...)
+    }
     if err != nil { writeError(w, http.StatusBadGateway, fmt.Errorf("apply updates: %w", err)); return }
     writeJSON(w, http.StatusOK, ApplyUpdatesResponse{OK: true, Packages: displayPackages, Output: trimCommandOutput(out)})
 }
