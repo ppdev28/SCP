@@ -137,6 +137,19 @@ export interface NetworkOverview {
   topology: NetworkTopology
 }
 
+export interface LogEntry {
+  timestamp: string
+  level: string
+  source: string
+  message: string
+}
+
+export interface LogsOverview {
+  entries: LogEntry[]
+  sources: string[]
+  updatedAt: string
+}
+
 export interface Toast {
   id: string
   message: string
