@@ -3,7 +3,8 @@ import type { Container, ContainerStatus, HealthStatus, HostOverview, SystemServ
 type ApiPort = { privatePort: number; publicPort?: number; type: string; ip?: string }
 type ApiContainer = { id: string; name: string; image: string; state: string; status: string; createdAt: number; ports?: ApiPort[]; networks?: string[] }
 type ApiService = SystemService
-type ApiActionResponse = { ok: boolean; name: string; action: string }
+type ApiContainerActionResponse = { ok: boolean; id: string }
+type ApiServiceActionResponse = { ok: boolean; name: string; action: string }
 export type ContainerAction = 'start' | 'stop' | 'restart'
 export type ServiceAction = 'start' | 'stop' | 'restart'
 const apiBase = '/api/v1'
@@ -44,11 +45,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export async function getHost(): Promise<HostOverview> { return request<HostOverview>('/host') }
 export async function getContainers(): Promise<Container[]> { const containers = await request<ApiContainer[]>('/containers'); return containers.map(toContainer) }
 export async function runContainerAction(id: string, action: ContainerAction): Promise<void> {
-  const response = await request<ApiActionResponse>(`/containers/${encodeURIComponent(id)}/${action}`, { method: 'POST' })
-  if (!response.ok || response.name || !response.action) throw new Error('SCP API returned an invalid container action response')
+  const response = await request<ApiContainerActionResponse>(`/containers/${encodeURIComponent(id)}/${action}`, { method: 'POST' })
+  if (!response.ok || response.id !== id) throw new Error('SCP API returned an invalid container action response')
 }
 export async function getServices(): Promise<SystemService[]> { return request<ApiService[]>('/services') }
 export async function runServiceAction(name: string, action: ServiceAction): Promise<void> {
-  const response = await request<ApiActionResponse>(`/services/${encodeURIComponent(name)}/${action}`, { method: 'POST' })
+  const response = await request<ApiServiceActionResponse>(`/services/${encodeURIComponent(name)}/${action}`, { method: 'POST' })
   if (!response.ok || response.name !== name || response.action !== action) throw new Error('SCP API returned an invalid service action response')
 }
