@@ -1,4 +1,4 @@
-import type { Container, ContainerStatus, HealthStatus, HostOverview, NetworkOverview, StorageOverview, SystemService } from './types'
+import type { Container, ContainerStatus, HealthStatus, HostOverview, NetworkOverview, StorageOverview, SystemService, LogsOverview } from './types'
 import type { MonitoringOverview } from './monitoring'
 
 type ApiPort = { privatePort: number; publicPort?: number; type: string; ip?: string }
@@ -24,3 +24,4 @@ export async function runServiceAction(name: string, action: ServiceAction): Pro
 export async function getStorage(): Promise<StorageOverview> { return request<StorageOverview>('/storage') }
 export async function getNetwork(): Promise<NetworkOverview> { return request<NetworkOverview>('/network') }
 export async function getMonitoring(): Promise<MonitoringOverview> { return request<MonitoringOverview>('/monitoring') }
+export async function getLogs(): Promise<LogsOverview> { return request<LogsOverview>('/logs') }
