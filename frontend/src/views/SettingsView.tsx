@@ -1,160 +1,68 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { T } from '../lib/tokens'
-import { Card, CardHeader, Btn, Input } from '../components/ui'
+import { Card, CardHeader, Btn } from '../components/ui'
+import { Check, RotateCcw, Monitor, Bell, Keyboard, ShieldCheck, Database, Gauge } from 'lucide-react'
 
-const SECTIONS = ['General','Server','Users','Authentication','Notifications','Appearance','API','Docker','Monitoring']
+const STORAGE_KEY = 'scp-web-settings'
+const SECTIONS = [
+  { id:'General', icon:<Gauge size={14}/>, description:'Interface and behavior' },
+  { id:'Appearance', icon:<Monitor size={14}/>, description:'Theme and visual preferences' },
+  { id:'Notifications', icon:<Bell size={14}/>, description:'Alerts and feedback' },
+  { id:'Keyboard', icon:<Keyboard size={14}/>, description:'Shortcuts and navigation' },
+  { id:'Security', icon:<ShieldCheck size={14}/>, description:'Confirmation safeguards' },
+  { id:'Data', icon:<Database size={14}/>, description:'Local browser data' },
+]
 
-function Field({ label, sub, children }:{ label:string; sub?:string; children:React.ReactNode }) {
-  return (
-    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',padding:'13px 18px',borderBottom:`1px solid ${T.borderMuted}`,gap:24}}>
-      <div style={{flex:1}}>
-        <div style={{fontSize:12,fontWeight:500,color:T.text}}>{label}</div>
-        {sub && <div style={{fontSize:11,color:T.textDim,marginTop:2,lineHeight:1.5}}>{sub}</div>}
-      </div>
-      <div style={{flexShrink:0}}>{children}</div>
-    </div>
-  )
+type WebSettings = {
+  compact: boolean
+  reduceMotion: boolean
+  autoRefresh: boolean
+  refreshSeconds: number
+  notifications: boolean
+  sound: boolean
+  shortcuts: boolean
+  confirmDestructive: boolean
+}
+const DEFAULTS: WebSettings = { compact:false, reduceMotion:false, autoRefresh:true, refreshSeconds:5, notifications:true, sound:false, shortcuts:true, confirmDestructive:true }
+
+function loadSettings(): WebSettings {
+  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } } catch { return DEFAULTS }
+}
+function Toggle({ checked, onChange }:{checked:boolean;onChange:(v:boolean)=>void}) {
+  return <button type="button" aria-pressed={checked} onClick={()=>onChange(!checked)} style={{width:36,height:20,borderRadius:10,position:'relative',cursor:'pointer',border:'none',background:checked?T.accent:T.overlay,transition:'background 180ms',padding:0}}>
+    <span style={{position:'absolute',top:3,left:checked?19:3,width:14,height:14,borderRadius:'50%',background:'#fff',transition:'left 160ms'}}/>
+  </button>
+}
+function SettingRow({label,sub,children}:{label:string;sub:string;children:React.ReactNode}) {
+  return <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:24,padding:'14px 18px',borderBottom:`1px solid ${T.borderMuted}`}}><div style={{minWidth:0}}><div style={{fontSize:12,fontWeight:600,color:T.text}}>{label}</div><div style={{fontSize:11,color:T.textDim,marginTop:3,lineHeight:1.45}}>{sub}</div></div><div style={{flexShrink:0}}>{children}</div></div>
+}
+function Select({value,onChange,children}:{value:string;onChange:(v:string)=>void;children:React.ReactNode}) {
+  return <select value={value} onChange={e=>onChange(e.target.value)} style={{height:32,minWidth:110,padding:'0 9px',background:T.raised,border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontSize:11,outline:'none',fontFamily:'Inter,sans-serif'}}>{children}</select>
 }
 
-function Toggle({ checked, onChange }:{ checked:boolean; onChange:(v:boolean)=>void }) {
-  return (
-    <button onClick={()=>onChange(!checked)} style={{
-      width:36,height:20,borderRadius:10,position:'relative',cursor:'pointer',border:'none',
-      background:checked?T.accent:T.overlay,
-      transition:'background 200ms',
-    }}>
-      <span style={{
-        position:'absolute',top:3,left:checked?18:3,width:14,height:14,borderRadius:'50%',
-        background:'#fff',transition:'left 180ms',
-      }}/>
-    </button>
-  )
-}
+export default function SettingsView({ addToast }:{addToast:(m:string,t:any)=>void}) {
+  const [active,setActive]=useState('General')
+  const [settings,setSettings]=useState<WebSettings>(loadSettings)
+  const [saved,setSaved]=useState(true)
 
-export default function SettingsView({ addToast }:{ addToast:(m:string,t:any)=>void }) {
-  const [active, setActive] = useState('General')
-  const [dark, setDark]     = useState(true)
-  const [notifs, setNotifs] = useState(true)
-  const [auto, setAuto]     = useState(false)
-  const [compress, setCompress] = useState(true)
-  const [hostname, setHostname] = useState('homelab-server')
-  const [sshPort, setSshPort]   = useState('22')
-  const [timezone, setTimezone] = useState('UTC')
+  useEffect(()=>{ document.documentElement.dataset.scpReduceMotion=settings.reduceMotion?'true':'false'; document.documentElement.dataset.scpCompact=settings.compact?'true':'false' },[settings.reduceMotion,settings.compact])
+  useEffect(()=>()=>{ delete document.documentElement.dataset.scpReduceMotion; delete document.documentElement.dataset.scpCompact },[])
 
-  const save = () => addToast('Settings saved','success')
+  const patch=(next:Partial<WebSettings>)=>{setSettings(s=>({...s,...next}));setSaved(false)}
+  const save=()=>{localStorage.setItem(STORAGE_KEY,JSON.stringify(settings));setSaved(true);addToast('Web app settings saved','success')}
+  const reset=()=>{setSettings(DEFAULTS);localStorage.removeItem(STORAGE_KEY);setSaved(true);addToast('Web app settings reset','success')}
 
-  return (
-    <div style={{padding:'22px 24px',display:'flex',gap:24}}>
-      {/* Left nav */}
-      <div style={{width:180,flexShrink:0}}>
-        <div style={{fontSize:11,fontWeight:700,color:T.textDim,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8,padding:'0 8px'}}>Settings</div>
-        {SECTIONS.map(s=>(
-          <button key={s} onClick={()=>setActive(s)} style={{
-            display:'block',width:'100%',padding:'7px 10px',borderRadius:7,textAlign:'left',
-            background:active===s?T.active:'none',border:'none',cursor:'pointer',
-            fontSize:12,fontWeight:active===s?500:400,color:active===s?T.text:T.textSub,
-            fontFamily:'Inter,sans-serif',
-          }}
-            onMouseEnter={e=>{if(active!==s)e.currentTarget.style.background=T.hover}}
-            onMouseLeave={e=>{if(active!==s)e.currentTarget.style.background='none'}}
-          >{s}</button>
-        ))}
-      </div>
+  const renderSection=()=>{
+    if(active==='General') return <Card><SettingRow label="Compact interface" sub="Reduce spacing in tables, lists and navigation."><Toggle checked={settings.compact} onChange={v=>patch({compact:v})}/></SettingRow><SettingRow label="Automatic refresh" sub="Allow live views to refresh their server data automatically."><Toggle checked={settings.autoRefresh} onChange={v=>patch({autoRefresh:v})}/></SettingRow><SettingRow label="Refresh interval" sub="Preferred interval for views that support automatic refresh."><Select value={String(settings.refreshSeconds)} onChange={v=>patch({refreshSeconds:Number(v)})}><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></Select></SettingRow></Card>
+    if(active==='Appearance') return <Card><SettingRow label="Theme" sub="The control panel is designed around its dark server-console interface."><Select value="dark" onChange={()=>{}}><option value="dark">Dark</option></Select></SettingRow><SettingRow label="Reduce motion" sub="Disable non-essential transitions and animated interface effects."><Toggle checked={settings.reduceMotion} onChange={v=>patch({reduceMotion:v})}/></SettingRow><SettingRow label="Interface density" sub="Choose between the standard and compact control-panel layout."><Select value={settings.compact?'compact':'comfortable'} onChange={v=>patch({compact:v==='compact'})}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></Select></SettingRow></Card>
+    if(active==='Notifications') return <Card><SettingRow label="In-app notifications" sub="Show toast messages when actions complete or fail."><Toggle checked={settings.notifications} onChange={v=>patch({notifications:v})}/></SettingRow><SettingRow label="Notification sound" sub="Play a subtle sound for important notifications."><Toggle checked={settings.sound} onChange={v=>patch({sound:v})}/></SettingRow></Card>
+    if(active==='Keyboard') return <Card><SettingRow label="Keyboard shortcuts" sub="Enable shortcuts such as ⌘ K for the command palette."><Toggle checked={settings.shortcuts} onChange={v=>patch({shortcuts:v})}/></SettingRow><SettingRow label="Command palette" sub="Use ⌘ K on macOS or Ctrl K on Linux/Windows to navigate quickly."><span style={{fontSize:11,color:T.textSub,fontFamily:'JetBrains Mono,monospace',padding:'5px 8px',background:T.bg,border:`1px solid ${T.border}`,borderRadius:5}}>⌘ K / Ctrl K</span></SettingRow></Card>
+    if(active==='Security') return <Card><SettingRow label="Confirm destructive actions" sub="Ask for confirmation before stopping, removing or terminating resources."><Toggle checked={settings.confirmDestructive} onChange={v=>patch({confirmDestructive:v})}/></SettingRow><div style={{padding:'14px 18px',fontSize:11,color:T.textDim,lineHeight:1.55}}>This preference only affects the web interface. Server-side permissions and authentication remain unchanged.</div></Card>
+    return <Card><CardHeader title="Browser data"/><div style={{padding:'16px 18px'}}><div style={{fontSize:12,color:T.textSub,lineHeight:1.55,marginBottom:14}}>SCP stores interface preferences locally in this browser. Server configuration, credentials and terminal data are not stored here.</div><Btn variant="danger" size="xs" onClick={reset}><RotateCcw size={11}/> Reset local settings</Btn></div></Card>
+  }
 
-      {/* Content */}
-      <div style={{flex:1,maxWidth:680}}>
-        <div style={{marginBottom:18}}>
-          <h2 style={{fontSize:15,fontWeight:700,color:T.text,letterSpacing:'-0.01em'}}>{active}</h2>
-        </div>
-
-        {active==='General' && (
-          <Card>
-            <Field label="Server name" sub="Displayed in the header and used as the page title.">
-              <Input value={hostname} onChange={setHostname} style={{width:200}}/>
-            </Field>
-            <Field label="Timezone" sub="Used for log timestamps and scheduled tasks.">
-              <select value={timezone} onChange={e=>setTimezone(e.target.value)} style={{height:32,padding:'0 10px',background:T.raised,border:`1px solid ${T.border}`,borderRadius:7,color:T.text,fontSize:12,outline:'none',fontFamily:'Inter,sans-serif'}}>
-                {['UTC','America/New_York','Europe/London','Europe/Berlin','Asia/Tokyo'].map(tz=><option key={tz}>{tz}</option>)}
-              </select>
-            </Field>
-            <Field label="Dark mode" sub="Server Control Center always uses a dark interface.">
-              <Toggle checked={dark} onChange={setDark}/>
-            </Field>
-            <Field label="Notifications" sub="Enable in-app notifications and toasts.">
-              <Toggle checked={notifs} onChange={setNotifs}/>
-            </Field>
-            <div style={{padding:'14px 18px',display:'flex',justifyContent:'flex-end'}}>
-              <Btn onClick={save} variant="primary">Save changes</Btn>
-            </div>
-          </Card>
-        )}
-
-        {active==='Server' && (
-          <Card>
-            <Field label="SSH port" sub="Port used for SSH connections. Changes require a server restart.">
-              <Input value={sshPort} onChange={setSshPort} style={{width:100}}/>
-            </Field>
-            <Field label="IP address" sub="Primary server IP address (read-only).">
-              <span style={{fontSize:12,color:T.textSub,fontFamily:'JetBrains Mono,monospace'}}>192.168.1.10</span>
-            </Field>
-            <Field label="Hostname" sub="System hostname as reported by the OS.">
-              <Input value={hostname} onChange={setHostname} style={{width:200}}/>
-            </Field>
-            <div style={{padding:'14px 18px',display:'flex',justifyContent:'flex-end'}}>
-              <Btn onClick={save} variant="primary">Save changes</Btn>
-            </div>
-          </Card>
-        )}
-
-        {active==='Docker' && (
-          <Card>
-            <Field label="Docker socket" sub="Path to the Docker daemon socket.">
-              <span style={{fontSize:11,color:T.textSub,fontFamily:'JetBrains Mono,monospace'}}>/var/run/docker.sock</span>
-            </Field>
-            <Field label="Pull timeout" sub="Maximum time in seconds to wait for image pulls.">
-              <Input value="300" onChange={()=>{}} style={{width:80}}/>
-            </Field>
-            <Field label="Log compression" sub="Compress old log files to save disk space.">
-              <Toggle checked={compress} onChange={setCompress}/>
-            </Field>
-            <Field label="Auto-prune" sub="Automatically remove unused images and volumes.">
-              <Toggle checked={auto} onChange={setAuto}/>
-            </Field>
-            <div style={{padding:'14px 18px',display:'flex',justifyContent:'flex-end'}}>
-              <Btn onClick={save} variant="primary">Save changes</Btn>
-            </div>
-          </Card>
-        )}
-
-        {active==='API' && (
-          <Card>
-            <CardHeader title="API tokens"/>
-            <div style={{padding:'16px 18px'}}>
-              <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16}}>
-                {[
-                  {name:'Monitoring agent', created:'Jan 1, 2024',last:'2 minutes ago'},
-                  {name:'Backup script',    created:'Jan 5, 2024',last:'3 hours ago'},
-                ].map(t=>(
-                  <div key={t.name} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 14px',background:T.bg,border:`1px solid ${T.border}`,borderRadius:8}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:12,fontWeight:600,color:T.text}}>{t.name}</div>
-                      <div style={{fontSize:11,color:T.textDim}}>Created {t.created} · Last used {t.last}</div>
-                    </div>
-                    <Btn size="xs" variant="danger" onClick={()=>addToast(`Token "${t.name}" revoked`,'error')}>Revoke</Btn>
-                  </div>
-                ))}
-              </div>
-              <Btn variant="secondary" onClick={()=>addToast('Token created — copy it now, it won\'t be shown again','success')}>Generate new token</Btn>
-            </div>
-          </Card>
-        )}
-
-        {!['General','Server','Docker','API'].includes(active) && (
-          <Card style={{padding:'40px 24px',textAlign:'center'}}>
-            <div style={{fontSize:13,color:T.textDim}}>Settings for <strong style={{color:T.textSub}}>{active}</strong> — coming soon</div>
-          </Card>
-        )}
-      </div>
-    </div>
-  )
+  return <div style={{padding:'22px 24px',display:'flex',gap:24,maxWidth:980}}>
+    <div style={{width:205,flexShrink:0}}><div style={{marginBottom:14}}><div style={{fontSize:15,fontWeight:700,color:T.text}}>Settings</div><div style={{fontSize:11,color:T.textDim,marginTop:3}}>Server Control web app</div></div><div style={{display:'flex',flexDirection:'column',gap:2}}>{SECTIONS.map(section=><button key={section.id} onClick={()=>setActive(section.id)} style={{display:'flex',alignItems:'center',gap:10,width:'100%',padding:'9px 10px',borderRadius:8,textAlign:'left',background:active===section.id?T.active:'transparent',border:'none',cursor:'pointer',color:active===section.id?T.text:T.textSub,fontFamily:'Inter,sans-serif'}}><span style={{display:'flex',color:active===section.id?T.accent:T.textDim}}>{section.icon}</span><span style={{minWidth:0}}><span style={{display:'block',fontSize:12,fontWeight:active===section.id?600:500}}>{section.id}</span><span style={{display:'block',fontSize:10,color:T.textDim,marginTop:2}}>{section.description}</span></span></button>)}</div></div>
+    <div style={{flex:1,minWidth:0}}><div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',marginBottom:14}}><div><h2 style={{fontSize:15,fontWeight:700,color:T.text,letterSpacing:'-.01em'}}>{active}</h2><div style={{fontSize:11,color:T.textDim,marginTop:3}}>Configure how Server Control behaves in this browser.</div></div><div style={{display:'flex',gap:7}}><Btn variant="secondary" size="xs" onClick={reset}><RotateCcw size={11}/> Reset</Btn><Btn variant="primary" size="xs" onClick={save} disabled={saved}>{saved?<Check size={11}/>:null}{saved?'Saved':'Save changes'}</Btn></div></div>{renderSection()}</div>
+  </div>
 }
