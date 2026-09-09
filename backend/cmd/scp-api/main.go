@@ -38,6 +38,8 @@ func main() {
 	mux.HandleFunc("POST /api/v1/containers/{id}/start", api.startContainer)
 	mux.HandleFunc("POST /api/v1/containers/{id}/stop", api.stopContainer)
 	mux.HandleFunc("POST /api/v1/containers/{id}/restart", api.restartContainer)
+	mux.HandleFunc("GET /api/v1/applications", api.listApplications)
+	mux.HandleFunc("POST /api/v1/applications/{id}/{action}", api.applicationAction)
 	mux.HandleFunc("GET /api/v1/services", api.listServices)
 	mux.HandleFunc("POST /api/v1/services/{name}/start", api.startService)
 	mux.HandleFunc("POST /api/v1/services/{name}/stop", api.stopService)
@@ -61,6 +63,8 @@ func main() {
 }
 func (a *API) health(w http.ResponseWriter,r *http.Request){ctx,cancel:=context.WithTimeout(r.Context(),3*time.Second);defer cancel();if _,err:=a.docker.Ping(ctx,client.PingOptions{});err!=nil{writeJSON(w,http.StatusServiceUnavailable,map[string]any{"status":"degraded","docker":"unavailable"});return};writeJSON(w,http.StatusOK,map[string]any{"status":"ok","docker":"available"})}
 func (a *API) host(w http.ResponseWriter,r *http.Request){overview,err:=collectHostOverview();if err!=nil{writeError(w,http.StatusInternalServerError,err);return};writeJSON(w,http.StatusOK,overview)}
+func (a *API) listApplications(w http.ResponseWriter,r *http.Request){applications,err:=collectApplications(r.Context(),a.docker);if err!=nil{writeError(w,http.StatusBadGateway,err);return};writeJSON(w,http.StatusOK,applications)}
+func (a *API) applicationAction(w http.ResponseWriter,r *http.Request){id:=r.PathValue("id");action:=r.PathValue("action");if action!="start"&&action!="stop"&&action!="restart"{writeJSON(w,http.StatusBadRequest,ErrorResponse{Error:"invalid application action"});return};applications,err:=collectApplications(r.Context(),a.docker);if err!=nil{writeError(w,http.StatusBadGateway,err);return};var ids []string;for _,app:=range applications{if app.ID==id{ids=app.ContainerIDs;break}};if len(ids)==0{writeJSON(w,http.StatusNotFound,ErrorResponse{Error:"application not found"});return};if err:=applicationAction(r.Context(),a.docker,ids,action);err!=nil{writeError(w,http.StatusBadGateway,err);return};writeJSON(w,http.StatusOK,map[string]any{"ok":true,"id":id,"action":action})}
 func (a *API) listServices(w http.ResponseWriter,r *http.Request){services,err:=collectServices(r.Context());if err!=nil{writeError(w,http.StatusBadGateway,err);return};writeJSON(w,http.StatusOK,services)}
 func (a *API) startService(w http.ResponseWriter,r *http.Request){a.serviceAction(w,r,"start")};func (a *API) stopService(w http.ResponseWriter,r *http.Request){a.serviceAction(w,r,"stop")};func (a *API) restartService(w http.ResponseWriter,r *http.Request){a.serviceAction(w,r,"restart")}
 func (a *API) serviceAction(w http.ResponseWriter,r *http.Request,action string){name:=r.PathValue("name");if !systemdUnitPattern.MatchString(name){writeJSON(w,http.StatusBadRequest,ErrorResponse{Error:"invalid systemd service name"});return};if err:=serviceAction(r.Context(),name,action);err!=nil{writeError(w,http.StatusBadGateway,err);return};writeJSON(w,http.StatusOK,map[string]any{"ok":true,"name":name,"action":action})}
