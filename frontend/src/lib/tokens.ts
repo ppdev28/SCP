@@ -1,4 +1,5 @@
 import type { ContainerStatus, HealthStatus } from './types'
+import '../styles/sidebar.css'
 
 export const T = {
   bg:           '#0b0c0f',
