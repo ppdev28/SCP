@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search, RefreshCw, Play, Square, RotateCw, ArrowLeft, ExternalLink, Layers3 } from 'lucide-react'
+import { Search, RefreshCw, Play, Square, RotateCw, ArrowLeft, ExternalLink } from 'lucide-react'
 import { T } from '../lib/tokens'
 import type { AppService } from '../lib/types'
 import { getApplications, runApplicationAction, type ApplicationAction } from '../lib/api'
