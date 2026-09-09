@@ -1,22 +1,22 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"log/slog"
-	"net/http"
-	"os"
-	"os/signal"
-	"regexp"
-	"strconv"
-	"strings"
-	"syscall"
-	"time"
+    "context"
+    "encoding/json"
+    "errors"
+    "log/slog"
+    "net/http"
+    "os"
+    "os/signal"
+    "regexp"
+    "strconv"
+    "strings"
+    "syscall"
+    "time"
 
-	"github.com/containerd/errdefs"
-	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/client"
+    "github.com/containerd/errdefs"
+    "github.com/moby/moby/api/types/container"
+    "github.com/moby/moby/client"
 )
 
 type API struct { docker *client.Client }
@@ -26,40 +26,41 @@ type ErrorResponse struct { Error string `json:"error"` }
 var containerIDPattern = regexp.MustCompile(`^[a-fA-F0-9]{12,64}$`)
 
 func main() {
-	level := new(slog.LevelVar); level.Set(slog.LevelInfo)
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})); slog.SetDefault(logger)
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM); defer stop()
-	docker, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation()); if err != nil { logger.Error("create docker client", "error", err); os.Exit(1) }; defer docker.Close()
-	api := &API{docker: docker}; mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/health", api.health)
-	mux.HandleFunc("GET /api/v1/host", api.host)
-	mux.HandleFunc("GET /api/v1/containers", api.listContainers)
-	mux.HandleFunc("GET /api/v1/containers/{id}", api.getContainer)
-	mux.HandleFunc("POST /api/v1/containers/{id}/start", api.startContainer)
-	mux.HandleFunc("POST /api/v1/containers/{id}/stop", api.stopContainer)
-	mux.HandleFunc("POST /api/v1/containers/{id}/restart", api.restartContainer)
-	mux.HandleFunc("GET /api/v1/applications", api.listApplications)
-	mux.HandleFunc("POST /api/v1/applications/{id}/{action}", api.applicationAction)
-	mux.HandleFunc("GET /api/v1/services", api.listServices)
-	mux.HandleFunc("POST /api/v1/services/{name}/start", api.startService)
-	mux.HandleFunc("POST /api/v1/services/{name}/stop", api.stopService)
-	mux.HandleFunc("POST /api/v1/services/{name}/restart", api.restartService)
-	mux.HandleFunc("GET /api/v1/storage", api.storage)
-	mux.HandleFunc("GET /api/v1/network", api.network)
-	mux.HandleFunc("GET /api/v1/monitoring", api.monitoring)
-	mux.HandleFunc("GET /api/v1/logs", api.logs)
-	mux.HandleFunc("POST /api/v1/terminal/exec", api.terminalExec)
-	mux.HandleFunc("GET /api/v1/security", api.security)
-	mux.HandleFunc("POST /api/v1/security/sessions/{pid}/terminate", api.terminateSecuritySession)
-	mux.HandleFunc("POST /api/v1/security/fix/{item}", api.fixSecurity)
-	mux.HandleFunc("GET /api/v1/updates", api.updates)
-	mux.HandleFunc("POST /api/v1/updates/refresh", api.refreshUpdates)
-	mux.HandleFunc("POST /api/v1/updates/apply", api.applyUpdates)
-	port := envInt("SCP_PORT", 8082)
-	server := &http.Server{Addr: ":"+strconv.Itoa(port), Handler: withCORS(withLogging(mux)), ReadHeaderTimeout:5*time.Second, ReadTimeout:40*time.Second, WriteTimeout:45*time.Second, IdleTimeout:60*time.Second}
-	go func(){ <-ctx.Done(); shutdownCtx,cancel:=context.WithTimeout(context.Background(),5*time.Second); defer cancel(); _=server.Shutdown(shutdownCtx) }()
-	logger.Info("SCP API listening", "addr", server.Addr)
-	if err:=server.ListenAndServe(); err!=nil && !errors.Is(err,http.ErrServerClosed){logger.Error("HTTP server stopped","error",err);os.Exit(1)}
+    level := new(slog.LevelVar); level.Set(slog.LevelInfo)
+    logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})); slog.SetDefault(logger)
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM); defer stop()
+    docker, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation()); if err != nil { logger.Error("create docker client", "error", err); os.Exit(1) }; defer docker.Close()
+    api := &API{docker: docker}; mux := http.NewServeMux()
+    mux.HandleFunc("GET /api/v1/health", api.health)
+    mux.HandleFunc("GET /api/v1/host", api.host)
+    mux.HandleFunc("GET /api/v1/containers", api.listContainers)
+    mux.HandleFunc("GET /api/v1/containers/{id}", api.getContainer)
+    mux.HandleFunc("POST /api/v1/containers/{id}/start", api.startContainer)
+    mux.HandleFunc("POST /api/v1/containers/{id}/stop", api.stopContainer)
+    mux.HandleFunc("POST /api/v1/containers/{id}/restart", api.restartContainer)
+    mux.HandleFunc("GET /api/v1/applications", api.listApplications)
+    mux.HandleFunc("POST /api/v1/applications/{id}/{action}", api.applicationAction)
+    mux.HandleFunc("GET /api/v1/services", api.listServices)
+    mux.HandleFunc("POST /api/v1/services/{name}/start", api.startService)
+    mux.HandleFunc("POST /api/v1/services/{name}/stop", api.stopService)
+    mux.HandleFunc("POST /api/v1/services/{name}/restart", api.restartService)
+    mux.HandleFunc("GET /api/v1/storage", api.storage)
+    mux.HandleFunc("GET /api/v1/network", api.network)
+    mux.HandleFunc("GET /api/v1/monitoring", api.monitoring)
+    mux.HandleFunc("GET /api/v1/logs", api.logs)
+    mux.HandleFunc("POST /api/v1/terminal/exec", api.terminalExec)
+    mux.HandleFunc("POST /api/v1/terminal/complete", api.terminalComplete)
+    mux.HandleFunc("GET /api/v1/security", api.security)
+    mux.HandleFunc("POST /api/v1/security/sessions/{pid}/terminate", api.terminateSecuritySession)
+    mux.HandleFunc("POST /api/v1/security/fix/{item}", api.fixSecurity)
+    mux.HandleFunc("GET /api/v1/updates", api.updates)
+    mux.HandleFunc("POST /api/v1/updates/refresh", api.refreshUpdates)
+    mux.HandleFunc("POST /api/v1/updates/apply", api.applyUpdates)
+    port := envInt("SCP_PORT", 8082)
+    server := &http.Server{Addr: ":"+strconv.Itoa(port), Handler: withCORS(withLogging(mux)), ReadHeaderTimeout:5*time.Second, ReadTimeout:40*time.Second, WriteTimeout:45*time.Second, IdleTimeout:60*time.Second}
+    go func(){ <-ctx.Done(); shutdownCtx,cancel:=context.WithTimeout(context.Background(),5*time.Second); defer cancel(); _=server.Shutdown(shutdownCtx) }()
+    logger.Info("SCP API listening", "addr", server.Addr)
+    if err:=server.ListenAndServe(); err!=nil && !errors.Is(err,http.ErrServerClosed){logger.Error("HTTP server stopped","error",err);os.Exit(1)}
 }
 func (a *API) health(w http.ResponseWriter,r *http.Request){ctx,cancel:=context.WithTimeout(r.Context(),3*time.Second);defer cancel();if _,err:=a.docker.Ping(ctx,client.PingOptions{});err!=nil{writeJSON(w,http.StatusServiceUnavailable,map[string]any{"status":"degraded","docker":"unavailable"});return};writeJSON(w,http.StatusOK,map[string]any{"status":"ok","docker":"available"})}
 func (a *API) host(w http.ResponseWriter,r *http.Request){overview,err:=collectHostOverview();if err!=nil{writeError(w,http.StatusInternalServerError,err);return};writeJSON(w,http.StatusOK,overview)}
@@ -73,6 +74,7 @@ func (a *API) network(w http.ResponseWriter,r *http.Request){ctx,cancel:=context
 func (a *API) monitoring(w http.ResponseWriter,r *http.Request){ctx,cancel:=context.WithTimeout(r.Context(),8*time.Second);defer cancel();overview,err:=collectMonitoring(ctx,a.docker);if err!=nil{writeError(w,http.StatusBadGateway,err);return};writeJSON(w,http.StatusOK,overview)}
 func (a *API) logs(w http.ResponseWriter,r *http.Request){ctx,cancel:=context.WithTimeout(r.Context(),12*time.Second);defer cancel();overview,err:=collectLogs(ctx,a.docker);if err!=nil{writeError(w,http.StatusBadGateway,err);return};writeJSON(w,http.StatusOK,overview)}
 func (a *API) terminalExec(w http.ResponseWriter,r *http.Request){var req TerminalExecRequest;if err:=json.NewDecoder(http.MaxBytesReader(w,r.Body,64*1024)).Decode(&req);err!=nil{writeJSON(w,http.StatusBadRequest,ErrorResponse{Error:"invalid terminal request"});return};if strings.TrimSpace(req.Command)==""{writeJSON(w,http.StatusBadRequest,ErrorResponse{Error:"command is required"});return};result,err:=executeTerminalCommand(r.Context(),req);if err!=nil{writeError(w,http.StatusInternalServerError,err);return};writeJSON(w,http.StatusOK,result)}
+func (a *API) terminalComplete(w http.ResponseWriter,r *http.Request){var req TerminalCompleteRequest;if err:=json.NewDecoder(http.MaxBytesReader(w,r.Body,16*1024)).Decode(&req);err!=nil{writeJSON(w,http.StatusBadRequest,ErrorResponse{Error:"invalid terminal completion request"});return};result,err:=completeTerminalInput(r.Context(),req);if err!=nil{writeError(w,http.StatusBadGateway,err);return};writeJSON(w,http.StatusOK,result)}
 func (a *API) listContainers(w http.ResponseWriter,r *http.Request){result,err:=a.docker.ContainerList(r.Context(),client.ContainerListOptions{All:true});if err!=nil{writeError(w,http.StatusBadGateway,err);return};containers:=result.Items;response:=make([]ContainerSummary,0,len(containers));for _,c:=range containers{response=append(response,summarizeContainer(c))};writeJSON(w,http.StatusOK,response)}
 func (a *API) getContainer(w http.ResponseWriter,r *http.Request){id:=r.PathValue("id");result,err:=a.docker.ContainerInspect(r.Context(),id,client.ContainerInspectOptions{});if err!=nil{status:=http.StatusBadGateway;if errdefs.IsNotFound(err){status=http.StatusNotFound};writeError(w,status,err);return};c:=result.Container;response:=map[string]any{"id":c.ID,"name":strings.TrimPrefix(c.Name,"/"),"image":c.Config.Image,"state":c.State.Status,"created":c.Created,"config":map[string]any{"env":c.Config.Env,"cmd":c.Config.Cmd,"entrypoint":c.Config.Entrypoint,"workingDir":c.Config.WorkingDir},"restartPolicy":c.HostConfig.RestartPolicy.Name,"mounts":c.Mounts,"networks":c.NetworkSettings.Networks,"ports":c.NetworkSettings.Ports,"labels":c.Config.Labels};writeJSON(w,http.StatusOK,response)}
 func (a *API) startContainer(w http.ResponseWriter,r *http.Request){a.containerAction(w,r,func(ctx context.Context,id string)error{_,err:=a.docker.ContainerStart(ctx,id,client.ContainerStartOptions{});return err})};func (a *API) stopContainer(w http.ResponseWriter,r *http.Request){a.containerAction(w,r,func(ctx context.Context,id string)error{_,err:=a.docker.ContainerStop(ctx,id,client.ContainerStopOptions{});return err})};func (a *API) restartContainer(w http.ResponseWriter,r *http.Request){a.containerAction(w,r,func(ctx context.Context,id string)error{_,err:=a.docker.ContainerRestart(ctx,id,client.ContainerRestartOptions{});return err})}
