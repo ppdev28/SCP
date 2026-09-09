@@ -7,6 +7,7 @@ import (
     "net/http"
     "os"
     "os/exec"
+    "regexp"
     "strconv"
     "strings"
     "time"
@@ -18,12 +19,15 @@ type FirewallRule struct { Number string `json:"number"`; To string `json:"to"`;
 type SecurityEvent struct { Timestamp string `json:"timestamp"`; Type string `json:"type"`; Message string `json:"message"` }
 type SecurityOverview struct { UpdatedAt string `json:"updatedAt"`; Checks []SecurityCheck `json:"checks"`; Sessions []SecuritySession `json:"sessions"`; FirewallActive bool `json:"firewallActive"`; FirewallRules []FirewallRule `json:"firewallRules"`; FirewallVersion string `json:"firewallVersion"`; Events []SecurityEvent `json:"events"` }
 
+var ufwActivePattern = regexp.MustCompile(`(?im)^\s*status\s*:\s*active\s*$`)
+
 func collectSecurity(ctx context.Context) (SecurityOverview, error) {
     overview := SecurityOverview{UpdatedAt: time.Now().UTC().Format(time.RFC3339), FirewallRules: []FirewallRule{}, Sessions: []SecuritySession{}, Events: []SecurityEvent{}}
     ufwStatus, _ := runSecurityCommand(ctx, "ufw", "status", "verbose")
-    firewallActive := strings.Contains(strings.ToLower(ufwStatus), "status: active")
+    firewallActive, firewallDetail := detectUFWActive(ufwStatus)
     overview.FirewallActive = firewallActive
     overview.FirewallRules = parseUFWRules(ufwStatus)
+    if version, err := runSecurityCommand(ctx, "ufw", "version"); err == nil { overview.FirewallVersion = firstLine(version) }
     sshConfig, _ := runSecurityCommand(ctx, "sshd", "-T")
     passwordAuth := configValue(sshConfig, "passwordauthentication")
     rootLogin := configValue(sshConfig, "permitrootlogin")
@@ -42,7 +46,7 @@ func collectSecurity(ctx context.Context) (SecurityOverview, error) {
     updatesActive, updatesDetail := unattendedUpdatesStatus(ctx)
     openPorts := countListeningPorts(ctx)
     overview.Checks = []SecurityCheck{
-        {Label: "Firewall (ufw)", OK: boolPtr(firewallActive), Detail: firewallDetail(firewallActive, overview.FirewallRules)},
+        {Label: "Firewall (ufw)", OK: boolPtr(firewallActive), Detail: firewallDetail},
         {Label: "SSH key auth only", OK: boolPtr(keyOnly), Detail: sshAuthDetail(passwordAuth)},
         {Label: "Root login disabled", OK: boolPtr(rootDisabled), Detail: rootLoginDetail(rootLogin)},
         {Label: "fail2ban", OK: boolPtr(fail2banOK), Detail: fail2banDetail},
@@ -52,6 +56,21 @@ func collectSecurity(ctx context.Context) (SecurityOverview, error) {
     overview.Sessions = collectSecuritySessions(ctx)
     overview.Events = collectSecurityEvents(ctx)
     return overview, nil
+}
+
+func detectUFWActive(status string) (bool, string) {
+    if ufwActivePattern.MatchString(status) { return true, fmt.Sprintf("Active · %d rules", len(parseUFWRules(status))) }
+    // `ufw status` can fail when the API user cannot elevate with sudo -n. The
+    // persistent UFW config is still readable and records whether UFW is enabled.
+    if conf, err := os.ReadFile("/etc/ufw/ufw.conf"); err == nil {
+        for _, line := range strings.Split(string(conf), "\n") {
+            parts := strings.SplitN(strings.TrimSpace(line), "=", 2)
+            if len(parts) == 2 && strings.EqualFold(strings.TrimSpace(parts[0]), "ENABLED") && strings.EqualFold(strings.TrimSpace(parts[1]), "yes") {
+                return true, "Enabled · UFW configuration reports ENABLED=yes"
+            }
+        }
+    }
+    return false, "Inactive"
 }
 
 func (a *API) security(w http.ResponseWriter, r *http.Request) {
@@ -101,6 +120,7 @@ func unattendedUpdatesStatus(ctx context.Context) (bool, string) { active, activ
 func countListeningPorts(ctx context.Context) int { out, err := runSecurityCommand(ctx, "ss", "-lntup"); if err != nil { return 0 }; count := 0; for _, line := range strings.Split(out, "\n") { s := strings.TrimSpace(line); if s != "" && !strings.HasPrefix(s, "Netid") { count++ } }; return count }
 func configValue(config, key string) string { for _, line := range strings.Split(config, "\n") { fields := strings.Fields(line); if len(fields) >= 2 && strings.EqualFold(fields[0], key) { return fields[1] } }; return "" }
 func findLine(text, prefix string) string { for _, line := range strings.Split(text, "\n") { if strings.HasPrefix(strings.TrimSpace(line), prefix) { return strings.TrimSpace(line) } }; return "" }
+func firstLine(text string) string { for _, line := range strings.Split(text, "\n") { if value := strings.TrimSpace(line); value != "" { return value } }; return "" }
 func boolPtr(v bool) *bool { return &v }
 func firewallDetail(active bool, rules []FirewallRule) string { if !active { return "Inactive" }; return fmt.Sprintf("Active · %d rules", len(rules)) }
 func sshAuthDetail(value string) string { if value == "no" { return "Password login disabled" }; if value == "" { return "Could not read sshd configuration" }; return "Password login enabled" }
