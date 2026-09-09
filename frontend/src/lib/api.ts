@@ -8,6 +8,7 @@ type ApiService = SystemService
 type ApiContainerActionResponse = { ok:boolean; id:string }
 type ApiServiceActionResponse = { ok:boolean; name:string; action:string }
 type ApiApplicationActionResponse = { ok:boolean; id:string; action:string }
+type ApiTerminalCompleteResponse = { candidates:string[] }
 export type ContainerAction = 'start'|'stop'|'restart'
 export type ServiceAction = 'start'|'stop'|'restart'
 export type ApplicationAction = 'start'|'stop'|'restart'
@@ -37,6 +38,7 @@ export async function getSecurity():Promise<SecurityOverview>{return request('/s
 export async function terminateSecuritySession(pid:number):Promise<void>{const response=await request<{ok:boolean;pid:number}>(`/security/sessions/${pid}/terminate`,{method:'POST'});if(!response.ok||response.pid!==pid)throw new Error('SCP API returned an invalid session response')}
 export async function fixSecurityItem(item:'auto-updates'):Promise<void>{const response=await request<{ok:boolean;item:string}>(`/security/fix/${item}`,{method:'POST'});if(!response.ok||response.item!==item)throw new Error('SCP API returned an invalid security fix response')}
 export async function execTerminal(command:string,cwd?:string):Promise<TerminalExecResponse>{return request('/terminal/exec',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command,cwd})})}
+export async function completeTerminal(input:string,cwd?:string):Promise<string[]>{const response=await request<ApiTerminalCompleteResponse>('/terminal/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({input,cwd})});return response.candidates}
 export async function getUpdates():Promise<UpdatesOverview>{return request('/updates')}
 export async function refreshUpdates():Promise<UpdatesOverview>{return request('/updates/refresh',{method:'POST'})}
 export async function applyUpdates(packages:string[],all=false):Promise<ApplyUpdatesResponse>{return request('/updates/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({packages,all})})}
