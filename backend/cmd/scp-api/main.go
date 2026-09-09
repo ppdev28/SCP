@@ -55,7 +55,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/updates", api.updates)
 	mux.HandleFunc("POST /api/v1/updates/refresh", api.refreshUpdates)
 	mux.HandleFunc("POST /api/v1/updates/apply", api.applyUpdates)
-	port := envInt("SCP_PORT", 8080)
+	port := envInt("SCP_PORT", 8082)
 	server := &http.Server{Addr: ":"+strconv.Itoa(port), Handler: withCORS(withLogging(mux)), ReadHeaderTimeout:5*time.Second, ReadTimeout:40*time.Second, WriteTimeout:45*time.Second, IdleTimeout:60*time.Second}
 	go func(){ <-ctx.Done(); shutdownCtx,cancel:=context.WithTimeout(context.Background(),5*time.Second); defer cancel(); _=server.Shutdown(shutdownCtx) }()
 	logger.Info("SCP API listening", "addr", server.Addr)
