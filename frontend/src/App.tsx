@@ -47,6 +47,7 @@ import ApplicationsView from "./views/ApplicationsView";
 import ServicesView from "./views/ServicesView";
 import StorageView from "./views/StorageView";
 import NetworkView from "./views/NetworkView";
+import VirtualMachinesView from "./views/VirtualMachinesView";
 import MonitoringView from "./views/MonitoringView";
 import LogsView from "./views/LogsView";
 import TerminalView from "./views/TerminalView";
@@ -1103,6 +1104,7 @@ export default function App() {
             {view === "services" && <ServicesView {...shell} />}{" "}
             {view === "storage" && <StorageView {...shell} />}{" "}
             {view === "network" && <NetworkView />}{" "}
+            {view === "virtual-machines" && <VirtualMachinesView addToast={addToast} />} {" "}
             {view === "monitoring" && <MonitoringView />}{" "}
             {view === "logs" && <LogsView />}{" "}
             {view === "terminal" && <TerminalView />}{" "}
