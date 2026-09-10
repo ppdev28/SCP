@@ -21,12 +21,11 @@ jobs:
           s = p.read_text()
           if 'import VirtualMachinesView from "./views/VirtualMachinesView";' not in s:
               s = s.replace('import NetworkView from "./views/NetworkView";\n', 'import NetworkView from "./views/NetworkView";\nimport VirtualMachinesView from "./views/VirtualMachinesView";\n')
-          marker = '            {view === "network" && <NetworkView />} {" "}\n'
+          marker = '            {view === "network" && <NetworkView />} {" "}'
           if 'view === "virtual-machines"' not in s:
-              replacement = marker + '            {view === "virtual-machines" && <VirtualMachinesView addToast={addToast} />} {" "}\n'
               if marker not in s:
                   raise SystemExit('network render marker not found')
-              s = s.replace(marker, replacement, 1)
+              s = s.replace(marker, marker + '\n            {view === "virtual-machines" && <VirtualMachinesView addToast={addToast} />} {" "}', 1)
           p.write_text(s)
           PY
           git config user.name 'github-actions[bot]'
