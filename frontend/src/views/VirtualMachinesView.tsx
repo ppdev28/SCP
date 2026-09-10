@@ -1,69 +1,58 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, MonitorCog, Play, RefreshCw, Square } from 'lucide-react'
+import { AlertTriangle, MonitorCog, Play, RefreshCw, Square } from 'lucide-react'
 import { T } from '../lib/tokens'
 import { getVirtualMachines, runVirtualMachineAction } from '../lib/api'
-import type { VirtualMachine, VirtualMachineAction } from '../lib/types'
+import type { ToastType, VirtualMachine, VirtualMachineAction } from '../lib/types'
 import { Btn, Card } from '../components/ui'
 
-function stateLabel(state: string) {
+function machineState(machine: VirtualMachine) {
+  return typeof machine.state === 'string' ? machine.state.trim() : 'Unknown'
+}
+
+function isRunning(machine: VirtualMachine) {
+  return machineState(machine).toLowerCase().includes('running')
+}
+
+function stateLabel(machine: VirtualMachine) {
+  const state = machineState(machine)
   const normalized = state.toLowerCase()
   if (normalized.includes('running')) return 'Running'
   if (normalized.includes('shut off')) return 'Shut off'
   if (normalized.includes('paused')) return 'Paused'
-  return state || 'Unknown'
+  return state
 }
 
-function isRunning(state: string) {
-  return state.toLowerCase().includes('running')
-}
-
-function StateBadge({ state }: { state: string }) {
-  const running = isRunning(state)
+function StateBadge({ machine }: { machine: VirtualMachine }) {
+  const running = isRunning(machine)
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: running ? T.green : T.textSub }}>
       <span style={{ width: 7, height: 7, borderRadius: '50%', background: running ? T.green : T.textDim, boxShadow: running ? `0 0 0 2px ${T.green}22` : 'none' }} />
-      {stateLabel(state)}
+      {stateLabel(machine)}
     </span>
   )
 }
 
 function MachineRow({ machine, busy, onAction }: { machine: VirtualMachine; busy: string | null; onAction: (machine: VirtualMachine, action: VirtualMachineAction) => void }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const running = isRunning(machine.state)
+  const running = isRunning(machine)
   const actionBusy = busy === machine.name
 
   return (
-    <tr onMouseLeave={() => setMenuOpen(false)} style={{ borderTop: `1px solid ${T.borderMuted}` }}>
+    <tr style={{ borderTop: `1px solid ${T.borderMuted}` }}>
       <td style={{ padding: '13px 16px' }}>
-        <span style={{ color: T.accent, fontSize: 13, fontWeight: 600, cursor: 'default' }}>{machine.name}</span>
+        <span style={{ color: T.accent, fontSize: 13, fontWeight: 600 }}>{machine.name}</span>
       </td>
-      <td style={{ padding: '13px 16px', color: T.textSub, fontSize: 12 }}>{machine.connection}</td>
-      <td style={{ padding: '13px 16px' }}><StateBadge state={machine.state} /></td>
+      <td style={{ padding: '13px 16px', color: T.textSub, fontSize: 12 }}>{machine.connection || 'System'}</td>
+      <td style={{ padding: '13px 16px' }}><StateBadge machine={machine} /></td>
       <td style={{ padding: '9px 16px', textAlign: 'right', width: 150 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, position: 'relative' }}>
-          <Btn size="sm" variant="outline" disabled={actionBusy} onClick={() => onAction(machine, running ? 'shutdown' : 'start')} icon={running ? <Square size={12} /> : <Play size={12} />}>
-            {actionBusy ? 'Working…' : running ? 'Shutdown' : 'Run'}
-          </Btn>
-          <button onClick={() => setMenuOpen(value => !value)} aria-label={`Actions for ${machine.name}`} style={{ width: 28, height: 28, border: `1px solid ${T.border}`, borderRadius: 6, background: menuOpen ? T.active : 'transparent', color: T.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ChevronDown size={13} />
-          </button>
-          {menuOpen && (
-            <div style={{ position: 'absolute', top: 34, right: 0, zIndex: 20, minWidth: 150, padding: 4, background: T.overlay, border: `1px solid ${T.borderStrong}`, borderRadius: 8, boxShadow: '0 12px 32px rgba(0,0,0,.35)' }}>
-              <button disabled={actionBusy || running} onClick={() => { setMenuOpen(false); onAction(machine, 'start') }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 9px', border: 0, borderRadius: 5, background: 'transparent', color: running ? T.textDim : T.textSub, cursor: running ? 'default' : 'pointer', textAlign: 'left', fontSize: 11 }}>
-                <Play size={12} /> Run
-              </button>
-              <button disabled={actionBusy || !running} onClick={() => { setMenuOpen(false); onAction(machine, 'shutdown') }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 9px', border: 0, borderRadius: 5, background: 'transparent', color: running ? T.textSub : T.textDim, cursor: running ? 'pointer' : 'default', textAlign: 'left', fontSize: 11 }}>
-                <Square size={12} /> Shut down
-              </button>
-            </div>
-          )}
-        </div>
+        <Btn size="sm" variant="outline" disabled={actionBusy} onClick={() => onAction(machine, running ? 'shutdown' : 'start')} icon={running ? <Square size={12} /> : <Play size={12} />}>
+          {actionBusy ? 'Working…' : running ? 'Shutdown' : 'Run'}
+        </Btn>
       </td>
     </tr>
   )
 }
 
-export default function VirtualMachinesView({ addToast }: { addToast: (message: string, type: any) => void }) {
+export default function VirtualMachinesView({ addToast }: { addToast: (message: string, type: ToastType) => void }) {
   const [machines, setMachines] = useState<VirtualMachine[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -72,10 +61,12 @@ export default function VirtualMachinesView({ addToast }: { addToast: (message: 
   const [filter, setFilter] = useState('')
 
   const load = useCallback(async (background = false) => {
-    if (background) setRefreshing(true); else setLoading(true)
+    if (background) setRefreshing(true)
+    else setLoading(true)
     setError(null)
     try {
-      setMachines(await getVirtualMachines())
+      const result = await getVirtualMachines()
+      setMachines(Array.isArray(result) ? result : [])
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to load virtual machines'
       setError(message)
@@ -86,7 +77,9 @@ export default function VirtualMachinesView({ addToast }: { addToast: (message: 
     }
   }, [addToast])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const filtered = useMemo(() => {
     const query = filter.trim().toLowerCase()
@@ -108,8 +101,8 @@ export default function VirtualMachinesView({ addToast }: { addToast: (message: 
     }
   }, [addToast, load])
 
-  const running = machines.filter(machine => isRunning(machine.state)).length
-  const stopped = machines.length - running
+  const running = machines.filter(isRunning).length
+  const stopped = Math.max(0, machines.length - running)
 
   return (
     <div style={{ padding: '22px 24px', width: '100%', maxWidth: 1400 }}>
@@ -155,7 +148,7 @@ export default function VirtualMachinesView({ addToast }: { addToast: (message: 
           <input value={filter} onChange={event => setFilter(event.target.value)} placeholder="Filter by name" style={{ width: 250, padding: '8px 10px', background: T.raised, border: `1px solid ${T.border}`, borderRadius: 6, outline: 'none', color: T.text, fontSize: 12 }} />
         </div>
 
-        {loading && !machines.length ? (
+        {loading ? (
           <div style={{ padding: 22, fontSize: 12, color: T.textDim }}>Loading virtual machines…</div>
         ) : filtered.length ? (
           <div style={{ overflowX: 'auto' }}>
