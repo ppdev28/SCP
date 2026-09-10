@@ -44,7 +44,7 @@ function MachineRow({ machine, busy, onAction }: { machine: VirtualMachine; busy
       <td style={{ padding: '13px 16px', color: T.textSub, fontSize: 12 }}>{machine.connection || 'System'}</td>
       <td style={{ padding: '13px 16px' }}><StateBadge machine={machine} /></td>
       <td style={{ padding: '9px 16px', textAlign: 'right', width: 150 }}>
-        <Btn size="sm" variant="outline" disabled={actionBusy} onClick={() => onAction(machine, running ? 'shutdown' : 'start')} icon={running ? <Square size={12} /> : <Play size={12} />}>
+        <Btn size="sm" variant="secondary" disabled={actionBusy} onClick={() => onAction(machine, running ? 'shutdown' : 'start')} icon={running ? <Square size={12} /> : <Play size={12} />} style={{ borderColor: T.accent, color: T.accent }}>
           {actionBusy ? 'Working…' : running ? 'Shutdown' : 'Run'}
         </Btn>
       </td>
