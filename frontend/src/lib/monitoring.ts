@@ -1,5 +1,3 @@
-import './virtualMachinesRuntime'
-
 if (typeof document !== 'undefined' && !document.getElementById('scp-sidebar-overflow-fix')) {
   const style = document.createElement('style')
   style.id = 'scp-sidebar-overflow-fix'
