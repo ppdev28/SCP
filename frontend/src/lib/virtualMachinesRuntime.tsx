@@ -1,100 +1,34 @@
-import { createRoot, type Root } from 'react-dom/client'
-import { X } from 'lucide-react'
 import { T } from './tokens'
-import VirtualMachinesView from '../views/VirtualMachinesView'
 
-let root: Root | null = null
 let overlay: HTMLDivElement | null = null
 let button: HTMLButtonElement | null = null
 let observer: MutationObserver | null = null
-
-function closeVirtualMachines() {
-  root?.unmount()
-  root = null
-  overlay?.remove()
-  overlay = null
-  if (button) {
-    button.style.background = 'none'
-    button.style.color = ''
-    button.dataset.scpVmActive = 'false'
-  }
+interface VM { name:string; connection:string; state:string }
+const esc = (value:string) => value.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c] || c))
+const running = (state:string) => state.toLowerCase().includes('running')
+const label = (state:string) => { const s=state.toLowerCase(); if(s.includes('running'))return'Running'; if(s.includes('shut off'))return'Shut off'; if(s.includes('paused'))return'Paused'; return state||'Unknown' }
+function activeButton(active:boolean){ if(!button)return; button.style.background=active?T.active:'none'; button.style.borderLeftColor=active?T.accent:'transparent'; const icon=button.querySelector('[data-scp-vm-icon]') as HTMLElement|null; const text=button.querySelector('[data-scp-vm-label]') as HTMLElement|null; if(icon)icon.style.color=active?T.accent:T.textDim; if(text)text.style.color=active?T.text:T.textSub }
+function close(){ overlay?.remove(); overlay=null; activeButton(false) }
+function open(){
+  if(overlay)return
+  const aside=document.querySelector('aside') as HTMLElement|null
+  overlay=document.createElement('div'); overlay.id='scp-virtual-machines-screen'; overlay.style.cssText=`position:fixed;top:52px;right:0;bottom:0;left:${aside?.getBoundingClientRect().right??220}px;background:${T.bg};overflow:auto;z-index:90;border-top:1px solid ${T.border}`
+  const closeButton=document.createElement('button'); closeButton.textContent='×'; closeButton.setAttribute('aria-label','Close virtual machines'); closeButton.style.cssText=`position:fixed;top:62px;right:16px;z-index:95;width:28px;height:28px;border:1px solid ${T.border};border-radius:6px;background:${T.raised};color:${T.textDim};font-size:18px;line-height:1;cursor:pointer`; closeButton.onclick=close
+  const mount=document.createElement('div'); overlay.append(closeButton,mount); document.body.appendChild(overlay); activeButton(true); render(mount)
 }
-
-function openVirtualMachines() {
-  if (overlay) return
-  const aside = document.querySelector('aside') as HTMLElement | null
-  overlay = document.createElement('div')
-  overlay.id = 'scp-virtual-machines-screen'
-  overlay.style.cssText = `position:fixed;top:52px;right:0;bottom:0;left:${aside?.getBoundingClientRect().right ?? 220}px;background:${T.bg};overflow:auto;z-index:90;border-top:1px solid ${T.border};box-shadow:-10px 0 30px rgba(0,0,0,.16)`
-
-  const toolbar = document.createElement('div')
-  toolbar.style.cssText = `position:sticky;top:0;z-index:5;height:42px;display:flex;align-items:center;padding:0 16px;background:${T.bg};border-bottom:1px solid ${T.border}`
-  const title = document.createElement('span')
-  title.textContent = 'Virtual machines'
-  title.style.cssText = `font-size:12px;font-weight:600;color:${T.text}`
-  const close = document.createElement('button')
-  close.setAttribute('aria-label', 'Close virtual machines')
-  close.style.cssText = `margin-left:auto;width:28px;height:28px;border:1px solid ${T.border};border-radius:6px;background:transparent;color:${T.textDim};cursor:pointer;display:flex;align-items:center;justify-content:center`
-  close.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
-  const svg = close.firstElementChild as SVGElement
-  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', '14'); svg.setAttribute('height', '14'); svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '2'); svg.innerHTML = '<path d="M18 6 6 18M6 6l12 12"/>'
-  close.onclick = closeVirtualMachines
-  toolbar.append(title, close)
-
-  const mount = document.createElement('div')
-  overlay.append(toolbar, mount)
-  document.body.appendChild(overlay)
-  root = createRoot(mount)
-  root.render(<VirtualMachinesView addToast={() => {}} />)
-  if (button) {
-    button.style.background = T.active
-    button.style.color = T.text
-    button.dataset.scpVmActive = 'true'
-  }
+function render(mount:HTMLElement){
+  mount.innerHTML=''; const page=document.createElement('div'); page.style.cssText='padding:22px 24px;max-width:1400px;width:100%;box-sizing:border-box'
+  page.innerHTML=`<div data-vm-heading style="display:flex;align-items:flex-start;margin-bottom:18px"><div><h1 style="font-size:17px;font-weight:700;color:${T.text};letter-spacing:-.02em;margin:0">Virtual machines</h1><p style="font-size:12px;color:${T.textDim};margin:3px 0 0">QEMU / libvirt virtual machines available on the system connection.</p></div><button data-refresh style="margin-left:auto;padding:5px 11px;border:1px solid ${T.border};border-radius:7px;background:transparent;color:${T.textSub};font-size:12px;cursor:pointer">Refresh</button></div><div data-summary style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px"></div><div data-card style="background:${T.raised};border:1px solid ${T.border};border-radius:10px;overflow:hidden"><div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid ${T.border}"><h2 style="font-size:15px;font-weight:700;color:${T.text};margin:0">Virtual machines</h2><div style="flex:1"></div><input data-filter placeholder="Filter by name" style="width:250px;padding:8px 10px;background:${T.raised};border:1px solid ${T.border};border-radius:6px;outline:none;color:${T.text};font-size:12px;box-sizing:border-box"></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:${T.bg}"><th style="padding:9px 16px;text-align:left;font-size:10px;font-weight:700;color:${T.textDim};text-transform:uppercase">Name</th><th style="padding:9px 16px;text-align:left;font-size:10px;font-weight:700;color:${T.textDim};text-transform:uppercase">Connection</th><th style="padding:9px 16px;text-align:left;font-size:10px;font-weight:700;color:${T.textDim};text-transform:uppercase">State</th><th style="padding:9px 16px;text-align:right"></th></tr></thead><tbody data-body></tbody></table></div></div>`
+  mount.appendChild(page)
+  const summary=page.querySelector('[data-summary]') as HTMLElement, body=page.querySelector('[data-body]') as HTMLElement, filter=page.querySelector('[data-filter]') as HTMLInputElement, refresh=page.querySelector('[data-refresh]') as HTMLButtonElement
+  let machines:VM[]=[]; let busy:string|null=null
+  const summaryCard=(title:string,value:string,sub:string)=>`<div style="background:${T.raised};border:1px solid ${T.border};border-radius:10px;padding:14px 16px"><div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;color:${T.accent}">${title}</span><span style="font-size:20px;font-weight:700;color:${T.text};font-family:JetBrains Mono,monospace">${value}</span></div><div style="margin-top:7px;font-size:10px;color:${T.textDim}">${sub}</div></div>`
+  const draw=()=>{ const q=filter.value.trim().toLowerCase(); const visible=machines.filter(m=>!q||m.name.toLowerCase().includes(q)); summary.innerHTML=summaryCard('Virtual machines',String(machines.length),`${machines.filter(m=>running(m.state)).length} running · ${machines.filter(m=>!running(m.state)).length} shut off`)+summaryCard('Connection','System','libvirt · qemu:///system'); body.innerHTML=''; if(!visible.length){const tr=document.createElement('tr');tr.innerHTML=`<td colspan="4" style="padding:26px;text-align:center;color:${T.textDim};font-size:12px">${machines.length?'No virtual machines match the filter.':'No virtual machines found on qemu:///system.'}</td>`;body.appendChild(tr);return} visible.forEach(m=>{const tr=document.createElement('tr');tr.style.borderTop=`1px solid ${T.borderMuted}`;const isRun=running(m.state);tr.innerHTML=`<td style="padding:13px 16px;color:${T.accent};font-size:13px;font-weight:600">${esc(m.name)}</td><td style="padding:13px 16px;color:${T.textSub};font-size:12px">${esc(m.connection)}</td><td style="padding:13px 16px"><span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:${isRun?T.green:T.textSub}"><span style="width:7px;height:7px;border-radius:50%;background:${isRun?T.green:T.textDim}"></span>${esc(label(m.state))}</span></td>`;const td=document.createElement('td');td.style.cssText='padding:9px 16px;text-align:right;width:150px';const b=document.createElement('button');b.textContent=busy===m.name?'Working…':isRun?'Shutdown':'Run';b.disabled=busy===m.name;b.style.cssText=`padding:5px 11px;border:1px solid ${T.accent};border-radius:7px;background:transparent;color:${T.accent};font-size:12px;cursor:${b.disabled?'not-allowed':'pointer'};opacity:${b.disabled?'.5':'1'}`;b.onclick=()=>void action(m,isRun?'shutdown':'start');td.appendChild(b);tr.appendChild(td);body.appendChild(tr)}) }
+  const load=async()=>{refresh.disabled=true;refresh.textContent='Refreshing…';try{const r=await fetch('/api/v1/virtual-machines');if(!r.ok)throw new Error((await r.json().catch(()=>null))?.error||`SCP API returned ${r.status}`);machines=await r.json() as VM[];draw()}catch(e){mount.innerHTML=`<div style="padding:24px;font-size:12px;color:${T.textSub}"><div style="color:${T.red};font-weight:600;margin-bottom:6px">Unable to load virtual machines</div>${esc(e instanceof Error?e.message:'Unknown error')}</div>`}finally{refresh.disabled=false;refresh.textContent='Refresh'}}
+  const action=async(m:VM,a:'start'|'shutdown')=>{busy=m.name;draw();try{const r=await fetch(`/api/v1/virtual-machines/${encodeURIComponent(m.name)}/${a}`,{method:'POST'});if(!r.ok)throw new Error((await r.json().catch(()=>null))?.error||`Unable to ${a} ${m.name}`);await load()}catch(e){alert(e instanceof Error?e.message:'Unable to control virtual machine')}finally{busy=null;draw()}}
+  filter.oninput=draw; refresh.onclick=()=>void load(); void load()
 }
-
-function installButton() {
-  const aside = document.querySelector('aside')
-  if (!aside) return
-  const nav = aside.querySelector('nav')
-  if (!nav || nav.querySelector('[data-scp-virtual-machines]')) return
-  const candidates = Array.from(nav.querySelectorAll('button'))
-  const networkButton = candidates.find(item => item.textContent?.trim() === 'Network')
-  if (!networkButton) return
-
-  button = networkButton.cloneNode(true) as HTMLButtonElement
-  button.dataset.scpVirtualMachines = 'true'
-  button.dataset.scpVmActive = 'false'
-  button.setAttribute('aria-label', 'Virtual machines')
-  button.querySelector('svg')?.remove()
-  const icon = document.createElement('span')
-  icon.textContent = '▣'
-  icon.style.cssText = `font-size:13px;line-height:1;color:${T.textDim};display:flex;flex-shrink:0`
-  const label = button.querySelector('span:last-child')
-  if (label) label.textContent = 'Virtual machines'
-  button.insertBefore(icon, button.firstChild)
-  button.onclick = event => { event.preventDefault(); event.stopPropagation(); openVirtualMachines() }
-  networkButton.insertAdjacentElement('afterend', button)
-
-  nav.querySelectorAll('button:not([data-scp-virtual-machines])').forEach(item => {
-    item.addEventListener('click', () => closeVirtualMachines(), { capture: true })
-  })
-}
-
-function reposition() {
-  if (!overlay) return
-  const aside = document.querySelector('aside') as HTMLElement | null
-  if (aside) overlay.style.left = `${aside.getBoundingClientRect().right}px`
-}
-
-function init() {
-  if (typeof document === 'undefined') return
-  installButton()
-  observer = new MutationObserver(() => { installButton(); reposition() })
-  observer.observe(document.body, { childList: true, subtree: true })
-  window.addEventListener('resize', reposition)
-}
-
-if (typeof window !== 'undefined') {
-  window.setTimeout(init, 0)
-}
+function installButton(){const aside=document.querySelector('aside');if(!aside)return;const nav=aside.querySelector('nav');if(!nav||nav.querySelector('[data-scp-virtual-machines]'))return;const network=Array.from(nav.querySelectorAll('button')).find(b=>b.textContent?.trim()==='Network');if(!network)return;button=network.cloneNode(true) as HTMLButtonElement;button.dataset.scpVirtualMachines='true';button.setAttribute('aria-label','Virtual machines');const spans=Array.from(button.querySelectorAll('span'));const oldIcon=spans[0] as HTMLElement|undefined;if(oldIcon){oldIcon.dataset.scpVmIcon='true';oldIcon.textContent='▣';oldIcon.style.fontSize='13px'}const text=spans[spans.length-1] as HTMLElement|undefined;if(text){text.dataset.scpVmLabel='true';text.textContent='Virtual machines'}button.onclick=e=>{e.preventDefault();e.stopPropagation();open()};network.insertAdjacentElement('afterend',button)}
+function reposition(){if(!overlay)return;const aside=document.querySelector('aside') as HTMLElement|null;if(aside)overlay.style.left=`${aside.getBoundingClientRect().right}px`}
+function init(){installButton();observer=new MutationObserver(()=>{installButton();reposition()});observer.observe(document.body,{childList:true,subtree:true});window.addEventListener('resize',reposition)}
+if(typeof window!=='undefined')window.setTimeout(init,0)
