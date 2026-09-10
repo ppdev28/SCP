@@ -24,5 +24,7 @@ export interface SecurityEvent { timestamp:string; type:string; message:string }
 export interface SecurityOverview { updatedAt:string; checks:SecurityCheck[]; sessions:SecuritySession[]; firewallActive:boolean; firewallRules:FirewallRule[]; firewallVersion:string; events:SecurityEvent[] }
 export interface UpdatePackage { package:string; current:string; available:string; type:'security'|'system'; source?:string }
 export interface UpdatesOverview { updatedAt:string; updates:UpdatePackage[]; securityCount:number; systemCount:number }
+export interface VirtualMachine { name:string; connection:string; state:string }
+export type VirtualMachineAction = 'start'|'shutdown'
 export interface Toast { id:string; message:string; type:ToastType }
 export interface ConfirmDialog { title:string; message:string; action:string; danger?:boolean; onConfirm:()=>void }
