@@ -1,5 +1,5 @@
 export type View =
-  | 'dashboard' | 'host' | 'containers' | 'container-detail' | 'container-create' | 'applications' | 'app-detail' | 'services' | 'storage' | 'network' | 'monitoring' | 'logs' | 'terminal' | 'security' | 'updates' | 'settings'
+  | 'dashboard' | 'host' | 'containers' | 'container-detail' | 'container-create' | 'applications' | 'app-detail' | 'services' | 'storage' | 'network' | 'virtual-machines' | 'monitoring' | 'logs' | 'terminal' | 'security' | 'updates' | 'settings'
 export type ContainerStatus = 'running' | 'stopped' | 'paused' | 'restarting' | 'exited'
 export type HealthStatus = 'healthy' | 'unhealthy' | 'starting' | 'none'
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
