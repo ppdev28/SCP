@@ -1,0 +1,43 @@
+name: fix-vm-integration
+on:
+  push:
+    branches: [feature/project-foundation]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/project-foundation
+          fetch-depth: 0
+      - name: Patch native VM view integration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('frontend/src/App.tsx')
+          s = p.read_text()
+          if 'import VirtualMachinesView from "./views/VirtualMachinesView";' not in s:
+              s = s.replace('import NetworkView from "./views/NetworkView";\n', 'import NetworkView from "./views/NetworkView";\nimport VirtualMachinesView from "./views/VirtualMachinesView";\n')
+          marker = '            {view === "network" && <NetworkView />} {" "}\n'
+          if 'view === "virtual-machines"' not in s:
+              replacement = marker + '            {view === "virtual-machines" && <VirtualMachinesView addToast={addToast} />} {" "}\n'
+              if marker not in s:
+                  raise SystemExit('network render marker not found')
+              s = s.replace(marker, replacement, 1)
+          p.write_text(s)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/src/App.tsx
+          git diff --cached --quiet || git commit -m 'fix(virtual-machines): render VM screen through React navigation'
+          git push origin HEAD:feature/project-foundation
+      - name: Remove temporary workflow
+        if: success()
+        shell: bash
+        run: |
+          git rm .github/workflows/fix-vm-integration.yml
+          git commit -m 'chore(virtual-machines): remove temporary integration workflow'
+          git push origin HEAD:feature/project-foundation
