@@ -20,14 +20,14 @@ jobs:
           p = Path('frontend/src/App.tsx')
           s = p.read_text()
           if 'import VirtualMachinesView from "./views/VirtualMachinesView";' not in s:
-              s = s.replace('import NetworkView from "./views/NetworkView";\n', 'import NetworkView from "./views/NetworkView";\nimport VirtualMachinesView from "./views/VirtualMachinesView";\n')
-          needle = '            {view === "network" && <NetworkView />} {" "}'
-          if needle not in s:
-              needle = '            {view === "network" && <NetworkView />} {" "}'
-          if needle not in s:
-              raise SystemExit('network render marker not found')
+              s = s.replace('import NetworkView from "./views/NetworkView";', 'import NetworkView from "./views/NetworkView";\nimport VirtualMachinesView from "./views/VirtualMachinesView";', 1)
           if 'view === "virtual-machines"' not in s:
-              s = s.replace(needle, needle + '\n            {view === "virtual-machines" && <VirtualMachinesView addToast={addToast} />} {" "}', 1)
+              lines = s.splitlines()
+              index = next((i for i, line in enumerate(lines) if 'view === "network"' in line), None)
+              if index is None:
+                  raise SystemExit('network render line not found')
+              lines.insert(index + 1, '            {view === "virtual-machines" && <VirtualMachinesView addToast={addToast} />} {" "}')
+              s = '\n'.join(lines) + ('\n' if s.endswith('\n') else '')
           p.write_text(s)
           PY
           git config user.name 'github-actions[bot]'
