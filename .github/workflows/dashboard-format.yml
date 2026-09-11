@@ -39,28 +39,33 @@ jobs:
 
           path = Path("frontend/src/App.tsx")
           source = path.read_text()
-
           import_line = 'import SettingsView from "./views/SettingsView";'
           dashboard_import = 'import RealDashboardView from "./views/DashboardView";'
           if dashboard_import not in source:
               source = source.replace(import_line, import_line + "\n" + dashboard_import, 1)
-
-          pattern = re.compile(
-              r'\{view === "dashboard" && \(\s*'
-              r'<DashboardView onNavigate=\{navigate\} addToast=\{addToast\} />\s*'
-              r'\)\}\s*\{\" \"\}'
-          )
+          pattern = re.compile(r'\{view === "dashboard" && \(\s*<DashboardView onNavigate=\{navigate\} addToast=\{addToast\} />\s*\)\}\s*\{\" \"\}')
           replacement = '{view === "dashboard" && <RealDashboardView onNavigate={navigate} addToast={addToast} />} {" "}'
           source, count = pattern.subn(replacement, source, count=1)
           if count != 1:
               raise SystemExit(f"dashboard render replacement count: {count}")
-
           path.write_text(source)
           PY
 
       - name: Format frontend
         working-directory: frontend
         run: pnpm format
+
+      - name: Diagnose generated TypeScript
+        shell: bash
+        run: |
+          echo '--- App.tsx around reported parser error ---'
+          nl -ba frontend/src/App.tsx | sed -n '318,335p'
+          echo '--- DashboardView.tsx around reported parser error ---'
+          nl -ba frontend/src/views/DashboardView.tsx | sed -n '270,286p'
+          echo '--- api.ts around reported parser errors ---'
+          nl -ba frontend/src/lib/api.ts | sed -n '38,48p'
+          echo '--- ui.tsx around reported parser errors ---'
+          nl -ba frontend/src/components/ui.tsx | sed -n '488,540p'
 
       - name: Build frontend
         working-directory: frontend
