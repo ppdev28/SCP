@@ -30,6 +30,10 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Upgrade formatter
+        working-directory: frontend
+        run: pnpm add -D oxfmt@0.67.0
+
       - name: Connect the native dashboard view
         shell: bash
         run: |
@@ -55,18 +59,6 @@ jobs:
         working-directory: frontend
         run: pnpm format
 
-      - name: Diagnose generated TypeScript
-        shell: bash
-        run: |
-          echo '--- App.tsx around reported parser error ---'
-          nl -ba frontend/src/App.tsx | sed -n '318,335p'
-          echo '--- DashboardView.tsx around reported parser error ---'
-          nl -ba frontend/src/views/DashboardView.tsx | sed -n '270,286p'
-          echo '--- api.ts around reported parser errors ---'
-          nl -ba frontend/src/lib/api.ts | sed -n '38,48p'
-          echo '--- ui.tsx around reported parser errors ---'
-          nl -ba frontend/src/components/ui.tsx | sed -n '488,540p'
-
       - name: Build frontend
         working-directory: frontend
         run: pnpm build
@@ -76,7 +68,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add frontend/src frontend/.oxfmtrc.json
+          git add frontend/src frontend/.oxfmtrc.json frontend/package.json frontend/pnpm-lock.yaml
           if git diff --cached --quiet; then
             echo 'No changes to commit.'
           else
