@@ -23,17 +23,18 @@ const DARK = {
   red: "#ef4444",
   purple: "#a78bfa",
 };
+
 const LIGHT = {
-  bg: "#f5f7fb",
-  bgSidebar: "#56575d",
+  bg: "#f1f3f8",
+  bgSidebar: "#ffffff",
   raised: "#ffffff",
-  overlay: "#ffffff",
-  hover: "#eef3fb",
-  active: "#e6eefb",
-  border: "#d8dee9",
-  borderRight: "rgb(90, 92, 95)",
-  borderMuted: "#e8ecf2",
-  borderStrong: "#b9c4d6",
+  overlay: "#f8fafc",
+  hover: "#e8edf5",
+  active: "#e2eaf8",
+  border: "#d6dce7",
+  borderRight: "#b8c7de",
+  borderMuted: "#e7ebf2",
+  borderStrong: "#b7c2d4",
   text: "#172033",
   textSub: "#4b5870",
   textDim: "#748198",
@@ -44,6 +45,7 @@ const LIGHT = {
   red: "#dc2626",
   purple: "#7c3aed",
 };
+
 function palette() {
   const settings = loadWebSettings();
   if (settings.theme === "light") return LIGHT;
@@ -51,8 +53,9 @@ function palette() {
     settings.theme === "system" &&
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-color-scheme: light)").matches
-  )
+  ) {
     return LIGHT;
+  }
   return DARK;
 }
 
@@ -126,15 +129,27 @@ export const STATUS_MAP: Record<
     label: "Running",
     pulse: true,
   },
-  stopped: { color: "#64748b", bg: "rgba(100,116,139,0.1)", label: "Stopped" },
-  paused: { color: "#d97706", bg: "rgba(217,119,6,0.1)", label: "Paused" },
+  stopped: {
+    color: "#64748b",
+    bg: "rgba(100,116,139,0.1)",
+    label: "Stopped",
+  },
+  paused: {
+    color: "#d97706",
+    bg: "rgba(217,119,6,0.1)",
+    label: "Paused",
+  },
   restarting: {
     color: "#d97706",
     bg: "rgba(217,119,6,0.1)",
     label: "Restarting",
     pulse: true,
   },
-  exited: { color: "#dc2626", bg: "rgba(220,38,38,0.1)", label: "Exited" },
+  exited: {
+    color: "#dc2626",
+    bg: "rgba(220,38,38,0.1)",
+    label: "Exited",
+  },
 };
 
 export const HEALTH_MAP: Record<
