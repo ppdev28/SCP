@@ -54,6 +54,7 @@ import TerminalView from "./views/TerminalView";
 import SecurityView from "./views/SecurityView";
 import UpdatesView from "./views/UpdatesView";
 import SettingsView from "./views/SettingsView";
+import RealDashboardView from "./views/DashboardView";
 import { loadWebSettings, subscribeWebSettings } from "./lib/webSettings";
 
 const SPARKLINE_CPU = [8, 14, 22, 18, 31, 27, 23, 28, 20, 23];
@@ -1079,7 +1080,7 @@ export default function App() {
             }}
           >
             {view === "dashboard" && (
-              <DashboardView onNavigate={navigate} addToast={addToast} />
+              <RealDashboardView onNavigate={navigate} addToast={addToast} />
             )}{" "}
             {view === "host" && <HostView />}{" "}
             {view === "containers" && (
@@ -1104,7 +1105,9 @@ export default function App() {
             {view === "services" && <ServicesView {...shell} />}{" "}
             {view === "storage" && <StorageView {...shell} />}{" "}
             {view === "network" && <NetworkView />}{" "}
-            {view === "virtual-machines" && <VirtualMachinesView addToast={addToast} />} {" "}
+            {view === "virtual-machines" && (
+              <VirtualMachinesView addToast={addToast} />
+            )}{" "}
             {view === "monitoring" && <MonitoringView />}{" "}
             {view === "logs" && <LogsView />}{" "}
             {view === "terminal" && <TerminalView />}{" "}
