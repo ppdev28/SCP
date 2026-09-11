@@ -1,0 +1,87 @@
+name: dashboard-format
+
+on:
+  push:
+    branches: [feature/project-foundation]
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/project-foundation
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Connect the native dashboard view
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("frontend/src/App.tsx")
+          source = path.read_text()
+
+          import_line = 'import SettingsView from "./views/SettingsView";'
+          dashboard_import = 'import RealDashboardView from "./views/DashboardView";'
+          if dashboard_import not in source:
+              source = source.replace(import_line, import_line + "\n" + dashboard_import, 1)
+
+          pattern = re.compile(
+              r'\{view === "dashboard" && \(\s*'
+              r'<DashboardView onNavigate=\{navigate\} addToast=\{addToast\} />\s*'
+              r'\)\}\s*\{\" \"\}'
+          )
+          replacement = '{view === "dashboard" && <RealDashboardView onNavigate={navigate} addToast={addToast} />} {" "}'
+          source, count = pattern.subn(replacement, source, count=1)
+          if count != 1:
+              raise SystemExit(f"dashboard render replacement count: {count}")
+
+          path.write_text(source)
+          PY
+
+      - name: Format frontend
+        working-directory: frontend
+        run: pnpm format
+
+      - name: Build frontend
+        working-directory: frontend
+        run: pnpm build
+
+      - name: Commit dashboard integration and formatting
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/src frontend/.oxfmtrc.json
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
+          else
+            git commit -m 'feat(dashboard): connect live server overview'
+            git push origin HEAD:feature/project-foundation
+          fi
+
+      - name: Remove temporary workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/dashboard-format.yml
+          git commit -m 'chore(dashboard): remove temporary integration workflow'
+          git push origin HEAD:feature/project-foundation
