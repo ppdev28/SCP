@@ -391,8 +391,8 @@ export function Header({
     <header
       style={{
         height: 52,
-        background: T.bg,
-        borderBottom: `1px solid ${T.border}`,
+        background: T.bgHeader,
+        borderBottom: `1px solid rgb(148, 179, 255)`,
         display: "flex",
         alignItems: "center",
         padding: "0 18px",

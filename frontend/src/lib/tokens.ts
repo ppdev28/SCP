@@ -4,7 +4,8 @@ import { loadWebSettings } from "./webSettings";
 
 const DARK = {
   bg: "#1c1e25",
-  bgSidebar: "rgb(7, 7, 8)",
+  bgSidebar: "rgb(6,6,6)",
+  bgHeader: "rgb(13, 19, 32)",
   raised: "rgb(7, 7, 8)",
   overlay: "#171a21",
   hover: "#1a1d26",
@@ -27,6 +28,7 @@ const DARK = {
 const LIGHT = {
   bg: "#f1f3f8",
   bgSidebar: "#ffffff",
+  bgHeader: "#ffffff",
   raised: "#ffffff",
   overlay: "#f8fafc",
   hover: "#e8edf5",
@@ -65,6 +67,9 @@ export const T = {
   },
   get bgSidebar() {
     return palette().bgSidebar;
+  },
+  get bgHeader() {
+    return palette().bgHeader;
   },
   get raised() {
     return palette().raised;
