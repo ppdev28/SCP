@@ -49,16 +49,10 @@ type ApiVirtualMachineActionResponse = {
   name: string;
   action: string;
 };
-type ApiTerminalCompleteResponse = { candidates: string[] };
 export type ContainerAction = "start" | "stop" | "restart";
 export type ServiceAction = "start" | "stop" | "restart";
 export type ApplicationAction = "start" | "stop" | "restart";
 export type VirtualMachineAction = "start" | "shutdown";
-export interface TerminalExecResponse {
-  output: string;
-  exitCode: number;
-  cwd: string;
-}
 export interface ApplyUpdatesResponse {
   ok: boolean;
   packages: string[];
@@ -251,30 +245,6 @@ export async function runVirtualMachineAction(
     throw new Error(
       "SCP API returned an invalid virtual machine action response",
     );
-}
-export async function execTerminal(
-  command: string,
-  cwd?: string,
-): Promise<TerminalExecResponse> {
-  return request("/terminal/exec", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ command, cwd }),
-  });
-}
-export async function completeTerminal(
-  input: string,
-  cwd?: string,
-): Promise<string[]> {
-  const response = await request<ApiTerminalCompleteResponse>(
-    "/terminal/complete",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input, cwd }),
-    },
-  );
-  return response.candidates;
 }
 export async function getUpdates(): Promise<UpdatesOverview> {
   return request("/updates");
