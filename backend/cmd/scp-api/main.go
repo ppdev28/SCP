@@ -52,6 +52,7 @@ func main() {
     mux.HandleFunc("GET /api/v1/logs", api.logs)
     mux.HandleFunc("POST /api/v1/terminal/exec", api.terminalExec)
     mux.HandleFunc("POST /api/v1/terminal/complete", api.terminalComplete)
+    mux.HandleFunc("GET /api/v1/terminal/ws", api.terminalWebSocket)
     mux.HandleFunc("GET /api/v1/security", api.security)
     mux.HandleFunc("POST /api/v1/security/sessions/{pid}/terminate", api.terminateSecuritySession)
     mux.HandleFunc("POST /api/v1/security/fix/{item}", api.fixSecurity)
