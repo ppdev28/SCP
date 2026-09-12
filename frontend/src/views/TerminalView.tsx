@@ -1,451 +1,343 @@
-import { useState, useRef, useEffect } from "react";
-import {
-  Plus,
-  Trash2,
-  Maximize2,
-  RefreshCw,
-  Copy,
-  ChevronDown,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Minus, Plus, RotateCcw } from "lucide-react";
 import { T } from "../lib/tokens";
-import { Btn } from "../components/ui";
-import { completeTerminal, execTerminal } from "../lib/api";
 
-interface Session {
-  id: string;
-  title: string;
-  lines: string[];
-  input: string;
-  cwd: string;
-  running: boolean;
-  completing: boolean;
+const INITIAL_FONT_SIZE = 16;
+const MIN_FONT_SIZE = 10;
+const MAX_FONT_SIZE = 28;
+
+const TERMINAL_LINES = [
+  { text: "pepe@ppserver:~$ ", type: "prompt", command: "ls" },
+  {
+    text: "backups  chrome-backup  cloudflared.deb  data  devops-lab  docker  Downloads  errors  go  Multimedia  projects  snap",
+    type: "output",
+  },
+  { text: "", type: "output" },
+  { text: "pepe@ppserver:~$ ", type: "prompt", command: "cd proyectos/" },
+  { text: "", type: "output" },
+  {
+    text: "pepe@ppserver:~/proyectos$ ",
+    type: "prompt",
+    command: "ls",
+  },
+  {
+    text: "'HK Pro'  HouseKeepingProject  padel-planet  SCP  soma-backend",
+    type: "output",
+  },
+  { text: "", type: "output" },
+  {
+    text: "pepe@ppserver:~/proyectos$ ",
+    type: "prompt",
+    command: "ls -l -a",
+  },
+  { text: "total 28", type: "output" },
+  {
+    text: "drwxrwxr-x  7 pepe pepe 4096 ago 13 11:50 .",
+    type: "output",
+  },
+  {
+    text: "drwxr-x--- 31 pepe pepe 4096 sep 11 17:55 ..",
+    type: "output",
+  },
+  {
+    text: "drwxrwxr-x  6 pepe pepe 4096 jul 15 18:14 'HK Pro'",
+    type: "output",
+  },
+  {
+    text: "drwxrwxr-x  3 pepe pepe 4096 jul 15 18:10 HouseKeepingProject",
+    type: "output",
+  },
+  {
+    text: "drwxrwxr-x 17 pepe pepe 4096 sep  9 11:55 padel-planet",
+    type: "output",
+  },
+  {
+    text: "drwxrwxr-x  7 pepe pepe 4096 sep 11 17:45 SCP",
+    type: "output",
+  },
+  {
+    text: "drwxrwxr-x 13 pepe pepe 4096 ago 19 10:10 soma-backend",
+    type: "output",
+  },
+  { text: "", type: "output" },
+  { text: "pepe@ppserver:~/proyectos$ ", type: "prompt", command: "" },
+] as const;
+
+type Appearance = "Black" | "Dim" | "White";
+
+const APPEARANCE = {
+  Black: { background: "#000000", foreground: "#e5e7eb" },
+  Dim: { background: "#101217", foreground: "#d5d8df" },
+  White: { background: "#f7f7f7", foreground: "#20242c" },
+} as const;
+
+function colorizeOutput(line: string) {
+  const parts = line.split(/(\b(?:HK Pro|HouseKeepingProject|padel-planet|SCP|soma-backend|projects|backups|chrome-backup|data|devops-lab|docker|Downloads|errors|go|Multimedia|snap)\b)/g);
+
+  return parts.map((part, index) => {
+    const isDirectory = /^(HK Pro|HouseKeepingProject|padel-planet|SCP|soma-backend|projects|backups|chrome-backup|data|devops-lab|docker|Downloads|errors|go|Multimedia|snap)$/.test(part);
+    return (
+      <span key={`${part}-${index}`} style={{ color: isDirectory ? "#5eb5ff" : "inherit" }}>
+        {part}
+      </span>
+    );
+  });
 }
-
-function mkSession(n: number): Session {
-  return {
-    id: String(n),
-    title: `Terminal ${n}`,
-    lines: [
-      "Connected to homelab-server",
-      "Interactive shell — commands execute on the server.",
-      "",
-    ],
-    input: "",
-    cwd: "/home/pepe",
-    running: false,
-    completing: false,
-  };
-}
-
-const ANSI_PATTERN =
-  /\u001b(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001b\\))/g;
-const hasClearSequence = (output: string) =>
-  /\u001b\[[0-9;]*[23]?J/.test(output);
-const stripAnsi = (output: string) =>
-  output.replace(ANSI_PATTERN, "").replace(/\r/g, "");
-const longestCommonPrefix = (values: string[]) => {
-  if (!values.length) return "";
-  let prefix = values[0];
-  for (const value of values.slice(1)) {
-    let i = 0;
-    while (i < prefix.length && i < value.length && prefix[i] === value[i]) i++;
-    prefix = prefix.slice(0, i);
-    if (!prefix) break;
-  }
-  return prefix;
-};
 
 export default function TerminalView() {
-  const [sessions, setSessions] = useState<Session[]>([mkSession(1)]);
-  const [active, setActive] = useState("1");
-  const [full, setFull] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [fontSize, setFontSize] = useState(INITIAL_FONT_SIZE);
+  const [appearance, setAppearance] = useState<Appearance>("Black");
+  const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const sess = sessions.find((s) => s.id === active);
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const theme = APPEARANCE[appearance];
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [sess?.lines, sess?.running]);
   useEffect(() => {
     inputRef.current?.focus();
-  }, [active]);
+  }, []);
 
-  const update = (patch: Partial<Session>) =>
-    setSessions((prev) =>
-      prev.map((s) => (s.id === active ? { ...s, ...patch } : s)),
-    );
-  const addSession = () => {
-    const n = sessions.reduce((m, s) => Math.max(m, Number(s.id)), 0) + 1;
-    const s = mkSession(n);
-    setSessions((prev) => [...prev, s]);
-    setActive(s.id);
-  };
-  const closeSession = (id: string) => {
-    if (sessions.length === 1) return;
-    const rest = sessions.filter((s) => s.id !== id);
-    setSessions(rest);
-    if (active === id) setActive(rest[rest.length - 1].id);
-  };
-  const clear = () => update({ lines: [], input: "" });
-  const reconnect = () =>
-    update({
-      lines: [
-        "Connected to homelab-server",
-        "Interactive shell — commands execute on the server.",
-        "",
-      ],
-      cwd: "/home/pepe",
-    });
+  const focusTerminal = () => inputRef.current?.focus();
 
-  const submit = async () => {
-    if (!sess || sess.running || !sess.input.trim()) return;
-    const command = sess.input;
-    const prompt = `pepe@homelab-server:${sess.cwd.replace("/home/pepe", "~")}$ ${command}`;
-    update({ input: "", running: true, lines: [...sess.lines, prompt] });
-    try {
-      const result = await execTerminal(command, sess.cwd);
-      const output = result.output || "";
-      const cleared =
-        hasClearSequence(output) ||
-        /^\s*clear\s*(?:;|&&|$)/.test(command.trim());
-      const cleanOutput = stripAnsi(output);
-      const nextLines = [
-        ...(cleared ? [] : sess.lines),
-        prompt,
-        ...(cleanOutput ? cleanOutput.split("\n") : []),
-      ];
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === active
-            ? {
-                ...s,
-                cwd: result.cwd || s.cwd,
-                running: false,
-                lines: [
-                  ...nextLines,
-                  `pepe@homelab-server:${(result.cwd || s.cwd).replace("/home/pepe", "~")}$ `,
-                ],
-              }
-            : s,
-        ),
-      );
-    } catch (error) {
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === active
-            ? {
-                ...s,
-                running: false,
-                lines: [
-                  ...s.lines,
-                  `SCP: ${error instanceof Error ? error.message : "command failed"}`,
-                  `pepe@homelab-server:${s.cwd.replace("/home/pepe", "~")}$ `,
-                ],
-              }
-            : s,
-        ),
-      );
-    }
-  };
+  const decreaseFont = () =>
+    setFontSize((size) => Math.max(MIN_FONT_SIZE, size - 1));
 
-  const tabComplete = async () => {
-    if (!sess || sess.running || sess.completing) return;
-    update({ completing: true });
-    try {
-      const candidates = await completeTerminal(sess.input, sess.cwd);
-      if (candidates.length === 1) {
-        const tokenStart =
-          Math.max(sess.input.lastIndexOf(" "), sess.input.lastIndexOf("\t")) +
-          1;
-        const replacement = candidates[0];
-        update({
-          input:
-            sess.input.slice(0, tokenStart) +
-            replacement +
-            (replacement.endsWith("/") ? "" : " "),
-        });
-      } else if (candidates.length > 1) {
-        const tokenStart =
-          Math.max(sess.input.lastIndexOf(" "), sess.input.lastIndexOf("\t")) +
-          1;
-        const currentToken = sess.input.slice(tokenStart);
-        const prefix = longestCommonPrefix(candidates);
-        if (prefix.length > currentToken.length)
-          update({ input: sess.input.slice(0, tokenStart) + prefix });
-      }
-    } catch {
-      // Completion is best-effort; a failed completion request must not disrupt the shell.
-    } finally {
-      update({ completing: false });
-    }
-  };
+  const increaseFont = () =>
+    setFontSize((size) => Math.min(MAX_FONT_SIZE, size + 1));
 
-  const copyOutput = async () => {
-    if (!sess) return;
-    try {
-      await navigator.clipboard.writeText(sess.lines.join("\n"));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {}
+  const reset = () => {
+    setFontSize(INITIAL_FONT_SIZE);
+    setAppearance("Black");
+    setInput("");
+    requestAnimationFrame(focusTerminal);
   };
 
   return (
     <div
       style={{
-        padding: full ? 0 : "22px 24px",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
-        height: "100%",
+        background: T.bg,
+        color: T.text,
       }}
     >
-      {!full && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            marginBottom: 14,
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                fontSize: 17,
-                fontWeight: 700,
-                color: T.text,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Terminal
-            </h1>
-            <p style={{ fontSize: 12, color: T.textDim, marginTop: 2 }}>
-              Integrated shell on homelab-server.
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            <Btn
-              variant="secondary"
-              size="xs"
-              icon={<RefreshCw size={11} />}
-              onClick={reconnect}
-            >
-              Reconnect
-            </Btn>
-            <Btn variant="ghost" size="xs" onClick={clear}>
-              Clear
-            </Btn>
-            <Btn
-              variant="ghost"
-              size="xs"
-              icon={<Copy size={11} />}
-              onClick={copyOutput}
-            >
-              {copied ? "Copied" : "Copy"}
-            </Btn>
-            <Btn
-              variant="ghost"
-              size="xs"
-              icon={<Maximize2 size={11} />}
-              onClick={() => setFull((v) => !v)}
-            >
-              Fullscreen
-            </Btn>
-            <Btn
-              variant="secondary"
-              size="xs"
-              icon={<Plus size={11} />}
-              onClick={addSession}
-            >
-              New session
-            </Btn>
-          </div>
-        </div>
-      )}
+      <style>{`
+        @keyframes coreops-terminal-cursor {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0; }
+        }
+      `}</style>
+
       <div
         style={{
-          flex: 1,
           display: "flex",
-          flexDirection: "column",
-          background: T.bg,
-          border: `1px solid ${T.border}`,
-          borderRadius: full ? 0 : 10,
-          overflow: "hidden",
-          ...(full ? { position: "fixed", inset: 0, zIndex: 500 } : {}),
+          alignItems: "center",
+          justifyContent: "space-between",
+          minHeight: 48,
+          padding: "0 18px 0 20px",
+          borderBottom: `1px solid ${T.border}`,
+          background: T.raised,
+          flexShrink: 0,
+          gap: 18,
         }}
       >
+        <span
+          style={{
+            color: T.textSub,
+            fontFamily: "JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 12,
+            whiteSpace: "nowrap",
+          }}
+        >
+          pepe@ppserver: ~/proyectos
+        </span>
+
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            background: T.raised,
-            borderBottom: `1px solid ${T.border}`,
+            gap: 14,
+            color: T.textDim,
+            fontSize: 11,
+            whiteSpace: "nowrap",
           }}
         >
-          <div style={{ display: "flex", flex: 1, overflowX: "auto" }}>
-            {sessions.map((s) => (
-              <div
-                key={s.id}
-                onClick={() => setActive(s.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 7,
-                  padding: "8px 14px",
-                  cursor: "pointer",
-                  borderRight: `1px solid ${T.border}`,
-                  background: active === s.id ? T.bg : "none",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: active === s.id ? T.text : T.textDim,
-                  }}
-                >
-                  {s.title}
-                </span>
-                {sessions.length > 1 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeSession(s.id);
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: T.textDim,
-                      padding: 1,
-                    }}
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "0 12px",
-            }}
-          >
+          <span>Font size</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button
+              type="button"
+              onClick={decreaseFont}
+              disabled={fontSize <= MIN_FONT_SIZE}
+              aria-label="Decrease font size"
+              style={{
+                width: 24,
+                height: 24,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: `1px solid ${T.border}`,
+                borderRadius: 4,
+                background: "transparent",
+                color: fontSize <= MIN_FONT_SIZE ? T.textDim : T.textSub,
+                cursor: fontSize <= MIN_FONT_SIZE ? "not-allowed" : "pointer",
+                opacity: fontSize <= MIN_FONT_SIZE ? 0.5 : 1,
+              }}
+            >
+              <Minus size={12} />
+            </button>
             <span
               style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: sess?.running ? T.yellow : T.green,
+                width: 24,
+                textAlign: "center",
+                color: T.textSub,
+                fontFamily: "JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: 11,
               }}
-            />
-            <span style={{ fontSize: 10, color: T.textDim }}>
-              {sess?.running ? "Running" : "Connected"}
+            >
+              {fontSize}
             </span>
-            <ChevronDown size={12} color={T.textDim} />
+            <button
+              type="button"
+              onClick={increaseFont}
+              disabled={fontSize >= MAX_FONT_SIZE}
+              aria-label="Increase font size"
+              style={{
+                width: 24,
+                height: 24,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: `1px solid ${T.border}`,
+                borderRadius: 4,
+                background: "transparent",
+                color: fontSize >= MAX_FONT_SIZE ? T.textDim : T.textSub,
+                cursor: fontSize >= MAX_FONT_SIZE ? "not-allowed" : "pointer",
+                opacity: fontSize >= MAX_FONT_SIZE ? 0.5 : 1,
+              }}
+            >
+              <Plus size={12} />
+            </button>
           </div>
-        </div>
-        {sess && (
-          <div
+
+          <span>Appearance</span>
+          <select
+            value={appearance}
+            onChange={(event) => setAppearance(event.target.value as Appearance)}
+            aria-label="Terminal appearance"
             style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              minHeight: 0,
+              height: 26,
+              minWidth: 74,
+              padding: "0 7px",
+              border: `1px solid ${T.border}`,
+              borderRadius: 4,
+              background: T.bg,
+              color: T.textSub,
+              fontSize: 11,
+              outline: "none",
+              cursor: "pointer",
             }}
           >
-            <div
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: "14px 16px",
-                cursor: "text",
-              }}
-              onClick={() => inputRef.current?.focus()}
-            >
-              <div
-                style={{
-                  fontFamily: "JetBrains Mono,monospace",
-                  fontSize: 12.5,
-                  lineHeight: 1.75,
-                }}
-              >
-                {sess.lines.map((line, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      color: line.startsWith("SCP:")
-                        ? T.red
-                        : line.startsWith("Connected")
-                          ? T.green
-                          : T.textSub,
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-all",
-                    }}
-                  >
-                    {line || "\u00a0"}
-                  </div>
-                ))}
-                <div ref={bottomRef} />
+            <option value="Black">Black</option>
+            <option value="Dim">Dim</option>
+            <option value="White">White</option>
+          </select>
+
+          <button
+            type="button"
+            onClick={reset}
+            style={{
+              height: 26,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "0 7px",
+              border: "none",
+              background: "transparent",
+              color: T.textDim,
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            <RotateCcw size={11} />
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={terminalRef}
+        onClick={focusTerminal}
+        tabIndex={0}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "auto",
+          background: theme.background,
+          color: theme.foreground,
+          padding: "18px 20px 28px",
+          cursor: "text",
+          outline: "none",
+        }}
+      >
+        <div
+          style={{
+            minWidth: "max-content",
+            fontFamily: "JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+            fontSize,
+            lineHeight: 1.5,
+            fontVariantLigatures: "none",
+            letterSpacing: 0,
+          }}
+        >
+          {TERMINAL_LINES.map((line, index) => {
+            const prompt = line.type === "prompt";
+            const command = prompt ? line.command : "";
+            const promptText = prompt ? line.text : "";
+            const userHost = promptText.startsWith("pepe@ppserver");
+            const pathMatch = promptText.match(/:(~(?:\/proyectos)?)\$ $/);
+
+            return (
+              <div key={`${line.text}-${index}`} style={{ whiteSpace: "pre" }}>
+                {prompt ? (
+                  <>
+                    <span style={{ color: "#63d471" }}>
+                      {userHost ? "pepe" : ""}
+                    </span>
+                    <span style={{ color: "#9aa4b2" }}>
+                      {userHost ? "@ppserver" : ""}
+                    </span>
+                    <span style={{ color: "#63d471" }}>
+                      {pathMatch?.[1] ?? ""}
+                    </span>
+                    <span style={{ color: "#e5e7eb" }}>$ </span>
+                    {command && (
+                      <span style={{ color: theme.foreground }}>{command}</span>
+                    )}
+                    {index === TERMINAL_LINES.length - 1 && (
+                      <>
+                        <span style={{ color: "#e5e7eb" }}>{input}</span>
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: `${Math.max(fontSize * 0.58, 7)}px`,
+                            height: `${fontSize * 1.05}px`,
+                            marginLeft: 1,
+                            verticalAlign: "-0.15em",
+                            background: "#e5e7eb",
+                            animation: "coreops-terminal-cursor 1s step-end infinite",
+                          }}
+                        />
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <span>{colorizeOutput(line.text)}</span>
+                )}
               </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "9px 16px",
-                borderTop: `1px solid ${T.border}`,
-                fontFamily: "JetBrains Mono,monospace",
-                fontSize: 12.5,
-              }}
-            >
-              <span
-                style={{ color: T.green, whiteSpace: "pre" }}
-              >{`pepe@homelab-server:${sess.cwd.replace("/home/pepe", "~")}$ `}</span>
-              <input
-                ref={inputRef}
-                value={sess.input}
-                disabled={sess.running}
-                onChange={(e) => update({ input: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void submit();
-                  } else if (e.key === "Tab") {
-                    e.preventDefault();
-                    void tabComplete();
-                  }
-                }}
-                style={{
-                  flex: 1,
-                  background: "none",
-                  border: "none",
-                  outline: "none",
-                  color: T.text,
-                  fontFamily: "JetBrains Mono,monospace",
-                  fontSize: 12.5,
-                  caretColor: T.green,
-                }}
-                spellCheck={false}
-                autoCapitalize="off"
-                autoCorrect="off"
-              />
-              {sess.running && (
-                <span style={{ fontSize: 10, color: T.yellow }}>
-                  executing…
-                </span>
-              )}
-              {sess.completing && (
-                <span style={{ fontSize: 10, color: T.textDim }}>tab…</span>
-              )}
-            </div>
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
